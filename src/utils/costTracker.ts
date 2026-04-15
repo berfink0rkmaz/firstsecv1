@@ -76,9 +76,9 @@ class CostTracker {
     private getCostDataPath(): string {
         const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         if (!workspaceRoot) {
-            return path.join(process.cwd(), '.fortify-costs.json');
+            return path.join(process.cwd(), '.firstsec-costs.json');
         }
-        return path.join(workspaceRoot, '.fortify-costs.json');
+        return path.join(workspaceRoot, '.firstsec-costs.json');
     }
 
     private loadCostData(): void {

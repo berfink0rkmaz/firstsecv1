@@ -1,6 +1,6 @@
 {
-  "name": "firstsecv1",
-  "displayName": "firstSecV1",
+  "name": "firstsec",
+  "displayName": "FirstSec",
   "description": "",
   "version": "0.0.1",
   "engines": {
@@ -14,7 +14,7 @@
   "contributes": {
     "commands": [
       {
-        "command": "firstsecv1.helloWorld",
+        "command": "firstsec.helloWorld",
         "title": "Hello World"
       }
     ]

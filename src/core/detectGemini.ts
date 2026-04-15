@@ -33,12 +33,12 @@ const MAX_NEIGHBORS = 3;
 const DETECTION_SNAPSHOT_FILE = '.gemini-detection.json';
 
 export async function detectVulnerabilitiesWithGemini(workspaceRoot: string): Promise<Vulnerability[]> {
-    const config = vscode.workspace.getConfiguration('fortifyPlugin');
+    const config = vscode.workspace.getConfiguration('firstsec');
     const apiKey = config.get<string>('geminiApiKey', '');
     const model = config.get<string>('geminiModel', 'gemini-1.5-flash-002');
 
     if (!apiKey) {
-        throw new Error('Gemini API key is not set in fortifyPlugin.geminiApiKey.');
+        throw new Error('Gemini API key is not set in firstsec.geminiApiKey.');
     }
 
     const files = await collectFiles(workspaceRoot);

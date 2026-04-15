@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Vulnerability } from '../types/vulnerability';
 
-const STATUS_FILE = '.fortify-status.json';
+const STATUS_FILE = '.firstsec-status.json';
 
 function getStatusFilePath(workspaceRoot: string) {
     return path.join(workspaceRoot, STATUS_FILE);

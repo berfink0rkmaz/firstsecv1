@@ -109,7 +109,7 @@ async function executeBatchFix(batchGroup: BatchGroup): Promise<boolean> {
         const prompt = generateBatchPrompt(batchGroup);
 
         // Get AI configuration
-        const config = vscode.workspace.getConfiguration('fortifyPlugin');
+        const config = vscode.workspace.getConfiguration('firstsec');
         const providerStr = config.get<string>('aiProvider', 'gemini');
         let apiKey = '';
         let model = '';
@@ -169,7 +169,7 @@ async function processBatchAIResponse(aiResponse: string, batchGroup: BatchGroup
     const { filePath, vulnType, vulnerabilities } = batchGroup;
     
     // Show the AI response to user for review
-    const output = vscode.window.createOutputChannel('Fortify Batch Fix Preview');
+    const output = vscode.window.createOutputChannel('Security Batch Fix Preview');
     output.clear();
     output.appendLine(`Batch Fix Preview for ${filePath}:`);
     output.appendLine(`Type: ${vulnType}`);

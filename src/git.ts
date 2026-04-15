@@ -13,7 +13,7 @@ export async function commitAndPush() {
     }
     try {
         await repo.add([]); // Stage all changes
-        await repo.commit('Auto-fix vulnerabilities with Fortify Plugin');
+        await repo.commit('Auto-fix vulnerabilities with Gemini security scan');
         await repo.push();
         showInfo('Committed and pushed auto-fixes!');
     } catch (err) {

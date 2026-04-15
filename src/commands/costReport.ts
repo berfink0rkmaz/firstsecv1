@@ -13,7 +13,7 @@ export async function showCostReport(): Promise<void> {
     
     // Create comprehensive cost report
     const report = `
-💰 **Fortify Extension Cost Report**
+💰 **Security Scan Cost Report**
 ====================================
 
 📊 **Current Period (Last 30 Days)**
@@ -56,7 +56,7 @@ ${Object.entries(summary.costByModel)
 `;
 
     // Show the report in an output panel
-    const output = vscode.window.createOutputChannel('Fortify Cost Report');
+    const output = vscode.window.createOutputChannel('Security Scan Cost Report');
     output.clear();
     output.appendLine(report);
     output.show(true);
@@ -77,7 +77,7 @@ export async function exportCostData(): Promise<void> {
         return;
     }
     
-    const fileName = `fortify-costs-${new Date().toISOString().slice(0, 10)}.csv`;
+    const fileName = `firstsec-costs-${new Date().toISOString().slice(0, 10)}.csv`;
     const filePath = vscode.Uri.file(path.join(workspaceRoot, fileName));
     
     try {

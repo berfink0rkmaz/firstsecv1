@@ -13,17 +13,17 @@ import { refreshVulnerabilities, setLastDetectionContext } from './commands/refr
 import { showCostReport, exportCostData, clearCostData } from './commands/costReport';
 import { showBatchOpportunityForVulnerability, showBatchOpportunities } from './commands/batchFix';
 import { detectBatchOpportunities } from './core/batchProcessor';
-import { FortifyVulnerabilityProvider, SeverityTreeItem, VulnerabilityTreeItem } from './ui/FortifyVulnerabilityProvider';
+import { FirstSecVulnerabilityProvider, SeverityTreeItem, VulnerabilityTreeItem } from './ui/FirstSecVulnerabilityProvider';
 
 export function activate(context: vscode.ExtensionContext) {
-    const provider = new FortifyVulnerabilityProvider();
-    const treeView = vscode.window.createTreeView('fortifyVulnerabilityExplorer', {
+    const provider = new FirstSecVulnerabilityProvider();
+    const treeView = vscode.window.createTreeView('firstsecVulnerabilityExplorer', {
         treeDataProvider: provider,
         canSelectMany: true
     });
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('fortify-plugin-deneme1.loadFprReport', async () => {
+        vscode.commands.registerCommand('firstsec.loadScanReport', async () => {
             try {
                 const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
                 if (!workspaceRoot) {
@@ -60,10 +60,10 @@ export function activate(context: vscode.ExtensionContext) {
                 showError('Failed to detect vulnerabilities with Gemini: ' + (e.message || e));
             }
         }),
-        vscode.commands.registerCommand('fortify-plugin-deneme1.refreshVulnerabilities', async () => {
+        vscode.commands.registerCommand('firstsec.refreshVulnerabilities', async () => {
             await refreshVulnerabilities(provider, provider.setVulnerabilities.bind(provider), resetAutoFixCount, setTotalVulns);
         }),
-        vscode.commands.registerCommand('fortify-plugin-deneme1.showVulnerabilityDetails', async (item: VulnerabilityTreeItem) => {
+        vscode.commands.registerCommand('firstsec.showVulnerabilityDetails', async (item: VulnerabilityTreeItem) => {
             const v = item.vuln;
             const buttons = ['Go to Code', 'Auto Fix'];
             
@@ -103,39 +103,39 @@ export function activate(context: vscode.ExtensionContext) {
                 await undoFalsePositiveSingle(v, provider);
             }
         }),
-        vscode.commands.registerCommand('fortify-plugin-deneme1.fixAll', async () => {
+        vscode.commands.registerCommand('firstsec.fixAll', async () => {
             await autoFixAll(provider, autoFixVulnerability);
         }),
-        vscode.commands.registerCommand('fortify-plugin-deneme1.fixSelected', async () => {
+        vscode.commands.registerCommand('firstsec.fixSelected', async () => {
             await autoFixSelected(treeView, autoFixVulnerability);
         }),
-        vscode.commands.registerCommand('fortify-plugin-deneme1.markFalsePositive', async () => {
+        vscode.commands.registerCommand('firstsec.markFalsePositive', async () => {
             await markFalsePositive(treeView, provider);
         }),
-        vscode.commands.registerCommand('fortify-plugin-deneme1.undoFalsePositive', async () => {
+        vscode.commands.registerCommand('firstsec.undoFalsePositive', async () => {
             await undoFalsePositive(treeView, provider);
         }),
-        vscode.commands.registerCommand('fortify-plugin-deneme1.showFalsePositivesForUndo', async () => {
+        vscode.commands.registerCommand('firstsec.showFalsePositivesForUndo', async () => {
             await showFalsePositivesForUndo(provider);
         }),
-        vscode.commands.registerCommand('fortify-plugin-deneme1.filterByStatus', async () => {
+        vscode.commands.registerCommand('firstsec.filterByStatus', async () => {
             await filterByStatus(provider);
         }),
-        vscode.commands.registerCommand('fortify-plugin-deneme1.buildProject', async () => {
-            const terminal = vscode.window.createTerminal({ name: 'Fortify Build' });
+        vscode.commands.registerCommand('firstsec.buildProject', async () => {
+            const terminal = vscode.window.createTerminal({ name: 'Security Scan Build' });
             terminal.show();
             terminal.sendText('mvn clean install');
             vscode.window.showInformationMessage('Build started: mvn clean install');
             // Optionally, you can listen for build completion if you want to parse output, but for now just notify start.
         }),
-        vscode.commands.registerCommand('fortify-plugin-deneme1.showCostReport', async () => {
+        vscode.commands.registerCommand('firstsec.showCostReport', async () => {
             await showCostReport();
         }),
         
-        vscode.commands.registerCommand('fortify-plugin-deneme1.exportCostData', async () => {
+        vscode.commands.registerCommand('firstsec.exportCostData', async () => {
             await exportCostData();
         }),
-        vscode.commands.registerCommand('fortify-plugin-deneme1.clearCostData', async () => {
+        vscode.commands.registerCommand('firstsec.clearCostData', async () => {
             await clearCostData();
         })
     );

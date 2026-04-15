@@ -36,7 +36,7 @@ export async function autoFixAll(provider: { getAllVulnerabilities: () => Vulner
             previews.push({ vuln, fixedCode });
         }
         // Show a summary in the Output panel
-        const output = vscode.window.createOutputChannel('Fortify AI Fix Preview');
+        const output = vscode.window.createOutputChannel('Security AI Fix Preview');
         output.clear();
         output.appendLine(`AI suggestions for ${severity} vulnerabilities:`);
         for (const { vuln, fixedCode } of previews) {
