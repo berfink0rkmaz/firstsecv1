@@ -1,22 +1,15 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
 import * as path from 'path';
-import JSZip from 'jszip';
-import { parseStringPromise } from 'xml2js';
-import { generatePrompt } from './prompts/severityLevelPrompt';
-import type { Vulnerability } from './types/vulnerability';
-import { parseFprFile } from './core/fprParser';
-import { showError, showInfo, showWarning, handleGeminiError } from './utils/errorHandler';
+import { detectVulnerabilitiesWithGemini } from './core/geminiDetector';
+import { showError, showInfo } from './utils/errorHandler';
 import { autoFixAll } from './commands/autoFixAll';
 import { autoFixSelected } from './commands/autoFixSelected';
 import { markFalsePositive } from './commands/markFalsePositive';
 import { undoFalsePositive, undoFalsePositiveSingle, showFalsePositivesForUndo } from './commands/undoFalsePositive';
 import { filterByStatus, currentStatusFilter } from './commands/filterByStatus';
-import { groupBySeverity, getSortedSeverityKeys } from './core/group';
-import { commitAndPush } from './git';
 import { autoFixVulnerability, setTotalVulns, resetAutoFixCount } from './core/autoFixVulnerability';
-import { saveStatuses, loadStatuses } from './core/statusStore';
-import { refreshVulnerabilities, setLastFprContext } from './commands/refreshVulnerabilities';
+import { loadStatuses } from './core/statusStore';
+import { refreshVulnerabilities } from './commands/refreshVulnerabilities';
 import { showCostReport, exportCostData, clearCostData } from './commands/costReport';
 import { showBatchOpportunityForVulnerability, showBatchOpportunities } from './commands/batchFix';
 import { detectBatchOpportunities } from './core/batchProcessor';
@@ -31,12 +24,13 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         vscode.commands.registerCommand('fortify-plugin-deneme1.loadFprReport', async () => {
-            const file = await vscode.window.showOpenDialog({ canSelectMany: false, filters: { 'FPR File': ['fpr'] } });
-            if (!file || file.length === 0) return;
             try {
                 const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
-                setLastFprContext(file[0].fsPath, workspaceRoot);
-                const vulns = await parseFprFile(file[0].fsPath, workspaceRoot);
+                if (!workspaceRoot) {
+                    showError('Open a workspace folder before running Gemini detection.');
+                    return;
+                }
+                const vulns = await detectVulnerabilitiesWithGemini(workspaceRoot);
                 // Merge statuses
                 const statusMap = loadStatuses(workspaceRoot);
                 for (const v of vulns) {
@@ -44,7 +38,7 @@ export function activate(context: vscode.ExtensionContext) {
                     if (statusMap[key]) v.status = statusMap[key] as 'open' | 'fixed' | 'false_positive' | 'needs_attention';
                 }
                 provider.setVulnerabilities(vulns);
-                showInfo(`Loaded ${vulns.length} vulnerabilities from: ${file[0].fsPath}`);
+                showInfo(`Detected ${vulns.length} vulnerabilities with Gemini.`);
                 resetAutoFixCount();
                 setTotalVulns(vulns.length);
 
@@ -62,7 +56,7 @@ export function activate(context: vscode.ExtensionContext) {
                     }
                 }
             } catch (e: any) {
-                showError('Failed to parse FPR file: ' + (e.message || e));
+                showError('Failed to detect vulnerabilities with Gemini: ' + (e.message || e));
             }
         }),
         vscode.commands.registerCommand('fortify-plugin-deneme1.refreshVulnerabilities', async () => {
