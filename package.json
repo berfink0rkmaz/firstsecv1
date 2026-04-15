@@ -1,7 +1,7 @@
 {
   "name": "firstsec",
   "displayName": "FirstSec",
-  "description": "",
+  "description": "Detect vulnerabilities with Gemini, review them, filter them, auto-fix them with AI, and push changes.",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.115.0"
@@ -9,15 +9,223 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onCommand:firstsec.loadScanReport",
+    "onCommand:firstsec.fixAll",
+    "onCommand:firstsec.fixSelected",
+    "onCommand:firstsec.filterByStatus",
+    "onCommand:firstsec.markFalsePositive",
+    "onView:firstsecVulnerabilityExplorer",
+    "onCommand:firstsec.refreshVulnerabilities"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
+    "configuration": {
+      "type": "object",
+      "title": "FirstSec Settings",
+      "properties": {
+        "firstsec.commitFrequency": {
+          "type": "number",
+          "default": 3,
+          "description": "Number of auto-fixes after which the extension prompts to commit and push changes."
+        },
+        "firstsec.aiPersona": {
+          "type": "string",
+          "default": "strictFixer",
+          "enum": [
+            "strictFixer",
+            "explainer",
+            "secureByDesign",
+            "owaspContextualizer",
+            "performanceAwareFixer",
+            "languageExpert",
+            "legacyFriendlyFixer",
+            "policyAlignedFixer",
+            "reviewerAssistant",
+            "chillBuddy"
+          ],
+          "enumDescriptions": [
+            "Strict Fixer: Returns only corrected code for the detected security issue.",
+            "Explainer: Explains the vulnerability, risk, and fix in detail.",
+            "Secure by Design: Suggests broader architectural improvements to remove vulnerability classes.",
+            "OWASP Contextualizer: Maps each security issue to OWASP Top 10 context.",
+            "Performance-Aware Fixer: Fixes vulnerabilities while considering performance impact.",
+            "Language Expert: Uses idiomatic patterns for the current language and stack.",
+            "Legacy-Friendly Fixer: Avoids modern constructs that might break older systems.",
+            "Policy-Aligned Fixer: Follows internal coding standards or security suppression policies.",
+            "Reviewer Assistant: Helps prepare commit messages, PR notes, and fix rationales.",
+            "Chill Buddy: Explains fixes supportively with a lighter tone."
+          ],
+          "description": "Choose how the AI should behave when fixing vulnerabilities."
+        },
+        "firstsec.aiProvider": {
+          "type": "string",
+          "enum": ["gemini", "openai", "claude"],
+          "default": "gemini",
+          "description": "Select the AI provider for auto-fix."
+        },
+        "firstsec.geminiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Gemini API key."
+        },
+        "firstsec.geminiModel": {
+          "type": "string",
+          "default": "gemini-1.5-flash-002",
+          "description": "Gemini model name used for detection and fixes."
+        },
+        "firstsec.openaiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "OpenAI API key."
+        },
+        "firstsec.openaiModel": {
+          "type": "string",
+          "default": "gpt-3.5-turbo",
+          "description": "OpenAI model name used for fixes."
+        },
+        "firstsec.claudeApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Claude API key."
+        },
+        "firstsec.claudeModel": {
+          "type": "string",
+          "default": "claude-3-opus-20240229",
+          "description": "Claude model name used for fixes."
+        }
+      }
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "firstsecVulnerabilityExplorer",
+          "name": "FirstSec Vulnerability Explorer"
+        }
+      ]
+    },
     "commands": [
       {
+        "command": "firstsec.loadScanReport",
+        "title": "Run Gemini Security Scan",
+        "icon": "$(search)"
+      },
+      {
+        "command": "firstsec.fixAll",
+        "title": "FirstSec: Auto-Fix All",
+        "icon": "$(lightbulb)"
+      },
+      {
+        "command": "firstsec.fixSelected",
+        "title": "FirstSec: Auto-Fix Selected"
+      },
+      {
+        "command": "firstsec.showVulnerabilityDetails",
+        "title": "FirstSec: Show Vulnerability Details"
+      },
+      {
+        "command": "firstsec.filterByStatus",
+        "title": "FirstSec: Filter By Status",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "firstsec.markFalsePositive",
+        "title": "FirstSec: Mark False Positive"
+      },
+      {
+        "command": "firstsec.undoFalsePositive",
+        "title": "FirstSec: Undo False Positive"
+      },
+      {
+        "command": "firstsec.showFalsePositivesForUndo",
+        "title": "FirstSec: Show False Positives for Undo"
+      },
+      {
+        "command": "firstsec.refreshVulnerabilities",
+        "title": "FirstSec: Refresh Vulnerabilities",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "firstsec.buildProject",
+        "title": "FirstSec: Build Project",
+        "icon": "$(wrench)"
+      },
+      {
+        "command": "firstsec.showCostReport",
+        "title": "FirstSec: Show Cost Report",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "firstsec.exportCostData",
+        "title": "FirstSec: Export Cost Data",
+        "icon": "$(download)"
+      },
+      {
+        "command": "firstsec.clearCostData",
+        "title": "FirstSec: Clear Cost Data",
+        "icon": "$(trash)"
+      },
+      {
         "command": "firstsec.helloWorld",
-        "title": "Hello World"
+        "title": "FirstSec: Hello World"
       }
-    ]
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "firstsec.loadScanReport",
+          "when": "view == firstsecVulnerabilityExplorer",
+          "group": "navigation@1"
+        },
+        {
+          "command": "firstsec.fixAll",
+          "when": "view == firstsecVulnerabilityExplorer",
+          "group": "navigation@2"
+        },
+        {
+          "command": "firstsec.refreshVulnerabilities",
+          "when": "view == firstsecVulnerabilityExplorer",
+          "group": "navigation@3"
+        },
+        {
+          "command": "firstsec.filterByStatus",
+          "when": "view == firstsecVulnerabilityExplorer",
+          "group": "navigation@4"
+        },
+        {
+          "command": "firstsec.buildProject",
+          "when": "view == firstsecVulnerabilityExplorer",
+          "group": "navigation@5"
+        },
+        {
+          "command": "firstsec.showCostReport",
+          "when": "view == firstsecVulnerabilityExplorer",
+          "group": "navigation@6"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "firstsec.showVulnerabilityDetails",
+          "when": "view == firstsecVulnerabilityExplorer && viewItem == vulnerability",
+          "group": "inline@1"
+        },
+        {
+          "command": "firstsec.fixSelected",
+          "when": "view == firstsecVulnerabilityExplorer && viewItem == vulnerability",
+          "group": "inline@2"
+        },
+        {
+          "command": "firstsec.markFalsePositive",
+          "when": "view == firstsecVulnerabilityExplorer && viewItem == vulnerability",
+          "group": "inline@3"
+        },
+        {
+          "command": "firstsec.undoFalsePositive",
+          "when": "view == firstsecVulnerabilityExplorer && viewItem == vulnerability",
+          "group": "inline@4"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
@@ -54,5 +262,8 @@
     "node-fetch": "^3.3.2",
     "uuid": "^13.0.0",
     "xml2js": "^0.6.2"
-  }
+  },
+  "extensionDependencies": [
+    "vscode.git"
+  ]
 }
