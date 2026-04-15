@@ -11,6 +11,7 @@
   ],
   "activationEvents": [
     "onCommand:firstsec.loadScanReport",
+    "onCommand:firstsec.rescanWithGemini",
     "onCommand:firstsec.fixAll",
     "onCommand:firstsec.fixSelected",
     "onCommand:firstsec.filterByStatus",
@@ -111,6 +112,11 @@
         "icon": "$(search)"
       },
       {
+        "command": "firstsec.rescanWithGemini",
+        "title": "Rescan with Gemini",
+        "icon": "$(sync)"
+      },
+      {
         "command": "firstsec.fixAll",
         "title": "FirstSec: Auto-Fix All",
         "icon": "$(lightbulb)"
@@ -188,19 +194,24 @@
           "group": "navigation@3"
         },
         {
-          "command": "firstsec.filterByStatus",
+          "command": "firstsec.rescanWithGemini",
           "when": "view == firstsecVulnerabilityExplorer",
           "group": "navigation@4"
         },
         {
-          "command": "firstsec.buildProject",
+          "command": "firstsec.filterByStatus",
           "when": "view == firstsecVulnerabilityExplorer",
           "group": "navigation@5"
         },
         {
-          "command": "firstsec.showCostReport",
+          "command": "firstsec.buildProject",
           "when": "view == firstsecVulnerabilityExplorer",
           "group": "navigation@6"
+        },
+        {
+          "command": "firstsec.showCostReport",
+          "when": "view == firstsecVulnerabilityExplorer",
+          "group": "navigation@7"
         }
       ],
       "view/item/context": [

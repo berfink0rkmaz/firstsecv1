@@ -22,47 +22,58 @@ export function activate(context: vscode.ExtensionContext) {
         canSelectMany: true
     });
 
+    async function runGeminiScan() {
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+        if (!workspaceRoot) {
+            showError('Open a workspace folder before running Gemini detection.');
+            return;
+        }
+
+        setLastDetectionContext(workspaceRoot);
+        const vulns = await detectVulnerabilitiesWithGemini(workspaceRoot);
+        const statusMap = loadStatuses(workspaceRoot);
+        for (const v of vulns) {
+            const key = getVulnerabilityStatusKey(v);
+            const legacyKey = getLegacyVulnerabilityStatusKey(v);
+            if (statusMap[key]) {
+                v.status = statusMap[key] as 'open' | 'fixed' | 'false_positive' | 'needs_attention';
+            } else if (statusMap[legacyKey]) {
+                v.status = statusMap[legacyKey] as 'open' | 'fixed' | 'false_positive' | 'needs_attention';
+            }
+        }
+
+        provider.setVulnerabilities(vulns);
+        showInfo(`Detected ${vulns.length} vulnerabilities with Gemini.`);
+        resetAutoFixCount();
+        setTotalVulns(vulns.length);
+
+        const batchOpportunity = detectBatchOpportunities(vulns);
+        if (batchOpportunity.totalBatches > 0) {
+            const choice = await vscode.window.showInformationMessage(
+                `Found ${batchOpportunity.totalBatches} batch opportunities for ${batchOpportunity.totalVulnerabilities} vulnerabilities.`,
+                'Enable Batch Mode',
+                'Continue with Individual Mode'
+            );
+
+            if (choice === 'Enable Batch Mode') {
+                showInfo('Batch mode enabled. Use "Fix All" or "Fix Selected" to process batches efficiently.');
+            }
+        }
+    }
+
     context.subscriptions.push(
         vscode.commands.registerCommand('firstsec.loadScanReport', async () => {
             try {
-                const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
-                if (!workspaceRoot) {
-                    showError('Open a workspace folder before running Gemini detection.');
-                    return;
-                }
-                setLastDetectionContext(workspaceRoot);
-                const vulns = await detectVulnerabilitiesWithGemini(workspaceRoot);
-                // Merge statuses
-                const statusMap = loadStatuses(workspaceRoot);
-                for (const v of vulns) {
-                    const key = getVulnerabilityStatusKey(v);
-                    const legacyKey = getLegacyVulnerabilityStatusKey(v);
-                    if (statusMap[key]) {
-                        v.status = statusMap[key] as 'open' | 'fixed' | 'false_positive' | 'needs_attention';
-                    } else if (statusMap[legacyKey]) {
-                        v.status = statusMap[legacyKey] as 'open' | 'fixed' | 'false_positive' | 'needs_attention';
-                    }
-                }
-                provider.setVulnerabilities(vulns);
-                showInfo(`Detected ${vulns.length} vulnerabilities with Gemini.`);
-                resetAutoFixCount();
-                setTotalVulns(vulns.length);
-
-                // Check for batch opportunities and inform user
-                const batchOpportunity = detectBatchOpportunities(vulns);
-                if (batchOpportunity.totalBatches > 0) {
-                    const choice = await vscode.window.showInformationMessage(
-                        `Found ${batchOpportunity.totalBatches} batch opportunities for ${batchOpportunity.totalVulnerabilities} vulnerabilities.`,
-                        'Enable Batch Mode',
-                        'Continue with Individual Mode'
-                    );
-                    
-                    if (choice === 'Enable Batch Mode') {
-                        showInfo('Batch mode enabled. Use "Fix All" or "Fix Selected" to process batches efficiently.');
-                    }
-                }
+                await runGeminiScan();
             } catch (e: any) {
                 showError('Failed to detect vulnerabilities with Gemini: ' + (e.message || e));
+            }
+        }),
+        vscode.commands.registerCommand('firstsec.rescanWithGemini', async () => {
+            try {
+                await runGeminiScan();
+            } catch (e: any) {
+                showError('Failed to rescan vulnerabilities with Gemini: ' + (e.message || e));
             }
         }),
         vscode.commands.registerCommand('firstsec.refreshVulnerabilities', async () => {
