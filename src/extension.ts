@@ -8,7 +8,7 @@ import { markFalsePositive } from './commands/markFalsePositive';
 import { undoFalsePositive, undoFalsePositiveSingle, showFalsePositivesForUndo } from './commands/undoFalsePositive';
 import { filterByStatus, currentStatusFilter } from './commands/filterByStatus';
 import { autoFixVulnerability, setTotalVulns, resetAutoFixCount } from './core/autoFixVulnerability';
-import { loadStatuses } from './core/statusStore';
+import { getLegacyVulnerabilityStatusKey, getVulnerabilityStatusKey, loadStatuses } from './core/statusStore';
 import { refreshVulnerabilities, setLastDetectionContext } from './commands/refreshVulnerabilities';
 import { showCostReport, exportCostData, clearCostData } from './commands/costReport';
 import { showBatchOpportunityForVulnerability, showBatchOpportunities } from './commands/batchFix';
@@ -35,8 +35,13 @@ export function activate(context: vscode.ExtensionContext) {
                 // Merge statuses
                 const statusMap = loadStatuses(workspaceRoot);
                 for (const v of vulns) {
-                    const key = `${v.filePath}:${v.line}`;
-                    if (statusMap[key]) v.status = statusMap[key] as 'open' | 'fixed' | 'false_positive' | 'needs_attention';
+                    const key = getVulnerabilityStatusKey(v);
+                    const legacyKey = getLegacyVulnerabilityStatusKey(v);
+                    if (statusMap[key]) {
+                        v.status = statusMap[key] as 'open' | 'fixed' | 'false_positive' | 'needs_attention';
+                    } else if (statusMap[legacyKey]) {
+                        v.status = statusMap[legacyKey] as 'open' | 'fixed' | 'false_positive' | 'needs_attention';
+                    }
                 }
                 provider.setVulnerabilities(vulns);
                 showInfo(`Detected ${vulns.length} vulnerabilities with Gemini.`);

@@ -1,6 +1,6 @@
 import { showError, showInfo } from '../utils/errorHandler';
 import { loadDetectionSnapshot } from '../core/detectGemini';
-import { loadStatuses } from '../core/statusStore';
+import { getLegacyVulnerabilityStatusKey, getVulnerabilityStatusKey, loadStatuses } from '../core/statusStore';
 import { setStatusFilter } from './filterByStatus';
 
 let lastWorkspaceRoot: string | null = null;
@@ -18,8 +18,13 @@ export async function refreshVulnerabilities(provider: any, setVulnerabilities: 
         const vulns = loadDetectionSnapshot(lastWorkspaceRoot);
         const statusMap = loadStatuses(lastWorkspaceRoot);
         for (const v of vulns) {
-            const key = `${v.filePath}:${v.line}`;
-            if (statusMap[key]) v.status = statusMap[key] as 'open' | 'fixed' | 'false_positive';
+            const key = getVulnerabilityStatusKey(v);
+            const legacyKey = getLegacyVulnerabilityStatusKey(v);
+            if (statusMap[key]) {
+                v.status = statusMap[key] as 'open' | 'fixed' | 'false_positive';
+            } else if (statusMap[legacyKey]) {
+                v.status = statusMap[legacyKey] as 'open' | 'fixed' | 'false_positive';
+            }
         }
         provider.setVulnerabilities(vulns);
         showInfo(`Refreshed ${vulns.length} vulnerabilities from the last Gemini snapshot.`);

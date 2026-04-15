@@ -8,11 +8,18 @@ function getStatusFilePath(workspaceRoot: string) {
     return path.join(workspaceRoot, STATUS_FILE);
 }
 
+export function getVulnerabilityStatusKey(vuln: Pick<Vulnerability, 'filePath' | 'line' | 'category' | 'abstract'>): string {
+    return `${vuln.filePath}:${vuln.line}:${vuln.category}:${vuln.abstract}`;
+}
+
+export function getLegacyVulnerabilityStatusKey(vuln: Pick<Vulnerability, 'filePath' | 'line'>): string {
+    return `${vuln.filePath}:${vuln.line}`;
+}
+
 export function saveStatuses(vulns: Vulnerability[], workspaceRoot: string) {
     const statusMap: Record<string, string> = {};
     for (const v of vulns) {
-        // Use filePath:line as a unique key
-        statusMap[`${v.filePath}:${v.line}`] = v.status;
+        statusMap[getVulnerabilityStatusKey(v)] = v.status;
     }
     fs.writeFileSync(getStatusFilePath(workspaceRoot), JSON.stringify(statusMap, null, 2), 'utf-8');
 }
