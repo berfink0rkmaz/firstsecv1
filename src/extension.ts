@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { detectVulnerabilitiesWithGemini } from './core/geminiDetector';
+import { detectVulnerabilitiesWithGemini } from './core/detectGemini';
 import { showError, showInfo } from './utils/errorHandler';
 import { autoFixAll } from './commands/autoFixAll';
 import { autoFixSelected } from './commands/autoFixSelected';
@@ -9,7 +9,7 @@ import { undoFalsePositive, undoFalsePositiveSingle, showFalsePositivesForUndo }
 import { filterByStatus, currentStatusFilter } from './commands/filterByStatus';
 import { autoFixVulnerability, setTotalVulns, resetAutoFixCount } from './core/autoFixVulnerability';
 import { loadStatuses } from './core/statusStore';
-import { refreshVulnerabilities } from './commands/refreshVulnerabilities';
+import { refreshVulnerabilities, setLastDetectionContext } from './commands/refreshVulnerabilities';
 import { showCostReport, exportCostData, clearCostData } from './commands/costReport';
 import { showBatchOpportunityForVulnerability, showBatchOpportunities } from './commands/batchFix';
 import { detectBatchOpportunities } from './core/batchProcessor';
@@ -30,6 +30,7 @@ export function activate(context: vscode.ExtensionContext) {
                     showError('Open a workspace folder before running Gemini detection.');
                     return;
                 }
+                setLastDetectionContext(workspaceRoot);
                 const vulns = await detectVulnerabilitiesWithGemini(workspaceRoot);
                 // Merge statuses
                 const statusMap = loadStatuses(workspaceRoot);
