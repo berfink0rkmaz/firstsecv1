@@ -30,6 +30,7 @@ const DEFAULT_EXCLUDE = '**/{node_modules,dist,out,build,target,.git,coverage,.n
 const MAX_FILES = 25;
 const MAX_FILE_SIZE = 20_000;
 const MAX_NEIGHBORS = 3;
+const DETECTION_SNAPSHOT_FILE = '.gemini-detection.json';
 
 export async function detectVulnerabilitiesWithGemini(workspaceRoot: string): Promise<Vulnerability[]> {
     const config = vscode.workspace.getConfiguration('fortifyPlugin');
@@ -51,7 +52,23 @@ export async function detectVulnerabilitiesWithGemini(workspaceRoot: string): Pr
         vulnerabilities.push(...mapFindings(parsed.vulnerabilities ?? [], file));
     }
 
+    saveDetectionSnapshot(workspaceRoot, vulnerabilities);
     return vulnerabilities;
+}
+
+export function loadDetectionSnapshot(workspaceRoot: string): Vulnerability[] {
+    const snapshotPath = getDetectionSnapshotPath(workspaceRoot);
+    if (!fs.existsSync(snapshotPath)) {
+        throw new Error('No Gemini detection snapshot found. Run detection first.');
+    }
+
+    try {
+        const raw = fs.readFileSync(snapshotPath, 'utf-8');
+        const parsed = JSON.parse(raw) as { vulnerabilities?: Vulnerability[] };
+        return Array.isArray(parsed.vulnerabilities) ? parsed.vulnerabilities : [];
+    } catch (error) {
+        throw new Error(`Failed to load Gemini detection snapshot: ${(error as Error).message}`);
+    }
 }
 
 async function collectFiles(workspaceRoot: string): Promise<ScanFile[]> {
@@ -263,4 +280,13 @@ function inferLanguage(filePath: string): string {
 
 function normalizePath(filePath: string): string {
     return filePath.replace(/\\/g, '/');
+}
+
+function saveDetectionSnapshot(workspaceRoot: string, vulnerabilities: Vulnerability[]): void {
+    const snapshotPath = getDetectionSnapshotPath(workspaceRoot);
+    fs.writeFileSync(snapshotPath, JSON.stringify({ vulnerabilities }, null, 2), 'utf-8');
+}
+
+function getDetectionSnapshotPath(workspaceRoot: string): string {
+    return path.join(workspaceRoot, DETECTION_SNAPSHOT_FILE);
 }

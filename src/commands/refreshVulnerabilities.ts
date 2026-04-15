@@ -1,5 +1,5 @@
 import { showError, showInfo } from '../utils/errorHandler';
-import { detectVulnerabilitiesWithGemini } from '../core/detectGemini';
+import { loadDetectionSnapshot } from '../core/detectGemini';
 import { loadStatuses } from '../core/statusStore';
 import { setStatusFilter } from './filterByStatus';
 
@@ -15,19 +15,19 @@ export async function refreshVulnerabilities(provider: any, setVulnerabilities: 
         return;
     }
     try {
-        const vulns = await detectVulnerabilitiesWithGemini(lastWorkspaceRoot);
+        const vulns = loadDetectionSnapshot(lastWorkspaceRoot);
         const statusMap = loadStatuses(lastWorkspaceRoot);
         for (const v of vulns) {
             const key = `${v.filePath}:${v.line}`;
             if (statusMap[key]) v.status = statusMap[key] as 'open' | 'fixed' | 'false_positive';
         }
         provider.setVulnerabilities(vulns);
-        showInfo(`Refreshed ${vulns.length} vulnerabilities with Gemini detection.`);
+        showInfo(`Refreshed ${vulns.length} vulnerabilities from the last Gemini snapshot.`);
         resetAutoFixCount();
         setTotalVulns(vulns.length);
         // Reset status filter to 'all'
         setStatusFilter('all');
     } catch (e: any) {
-        showError('Failed to refresh Gemini detection: ' + (e.message || e));
+        showError('Failed to refresh Gemini snapshot: ' + (e.message || e));
     }
 }
