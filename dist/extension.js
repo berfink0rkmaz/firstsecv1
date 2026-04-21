@@ -7173,7 +7173,7 @@ var DETECTION_SNAPSHOT_FILE = ".gemini-detection.json";
 async function detectVulnerabilitiesWithGemini(workspaceRoot) {
   const config2 = vscode2.workspace.getConfiguration("firstsec");
   const apiKey = config2.get("geminiApiKey", "");
-  const model = config2.get("geminiModel", "gemini-1.5-flash-002");
+  const model = config2.get("geminiModel", "gemini-2.5-flash");
   if (!apiKey) {
     throw new Error("Gemini API key is not set in firstsec.geminiApiKey.");
   }
@@ -7857,7 +7857,7 @@ ${generatePrompt({
     let model = "";
     if (providerStr === "gemini") {
       apiKey = config2.get("geminiApiKey", "");
-      model = config2.get("geminiModel", "gemini-1.5-flash-002");
+      model = config2.get("geminiModel", "gemini-2.5-flash");
     } else if (providerStr === "openai") {
       apiKey = config2.get("openaiApiKey", "");
       model = config2.get("openaiModel", "gpt-3.5-turbo");
@@ -8130,7 +8130,7 @@ async function executeBatchFix(batchGroup) {
     let model = "";
     if (providerStr === "gemini") {
       apiKey = config2.get("geminiApiKey", "");
-      model = config2.get("geminiModel", "gemini-1.5-flash-002");
+      model = config2.get("geminiModel", "gemini-2.5-flash");
     } else if (providerStr === "openai") {
       apiKey = config2.get("openaiApiKey", "");
       model = config2.get("openaiModel", "gpt-3.5-turbo");

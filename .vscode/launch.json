@@ -11,10 +11,7 @@
 			"outFiles": [
 				"${workspaceFolder}/dist/**/*.js"
 			],
-			"preLaunchTask": "${defaultBuildTask}",
-			"env": {
-				"GEMINI_API_KEY": "AIzaSyCG_6OLf-xl8FmF5_ECqPqeWWLXsogsmzY"
-			}
+			"preLaunchTask": "${defaultBuildTask}"
 		}
 	]
 }

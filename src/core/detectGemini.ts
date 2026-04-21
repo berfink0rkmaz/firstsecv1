@@ -35,7 +35,7 @@ const DETECTION_SNAPSHOT_FILE = '.gemini-detection.json';
 export async function detectVulnerabilitiesWithGemini(workspaceRoot: string): Promise<Vulnerability[]> {
     const config = vscode.workspace.getConfiguration('firstsec');
     const apiKey = config.get<string>('geminiApiKey', '');
-    const model = config.get<string>('geminiModel', 'gemini-1.5-flash-002');
+    const model = config.get<string>('geminiModel', 'gemini-2.5-flash');
 
     if (!apiKey) {
         throw new Error('Gemini API key is not set in firstsec.geminiApiKey.');

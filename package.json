@@ -72,8 +72,8 @@
         },
         "firstsec.geminiModel": {
           "type": "string",
-          "default": "gemini-1.5-flash-002",
-          "description": "Gemini model name used for detection and fixes."
+          "default": "gemini-2.5-flash",
+          "description": "Gemini model name used for detection and fixes. For the free tier, gemini-2.5-flash is a good default."
         },
         "firstsec.openaiApiKey": {
           "type": "string",
