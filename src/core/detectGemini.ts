@@ -4,6 +4,7 @@ import * as path from 'path';
 import { callAI } from '../api/gemini';
 import { generateDetectionPrompt } from '../prompts/detectPrompt';
 import type { Vulnerability } from '../types/vulnerability';
+import { isProtectedFile } from '../utils/protectedFiles';
 
 type GeminiFinding = {
     category?: unknown;
@@ -87,6 +88,10 @@ async function collectFiles(workspaceRoot: string): Promise<ScanFile[]> {
 
         const filePath = normalizePath(path.relative(workspaceRoot, uri.fsPath));
         if (!filePath || filePath.startsWith('..')) {
+            continue;
+        }
+
+        if (isProtectedFile(filePath)) {
             continue;
         }
 

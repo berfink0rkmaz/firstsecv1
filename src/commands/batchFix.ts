@@ -7,6 +7,7 @@ import { costTracker } from '../utils/costTracker';
 import type { Vulnerability } from '../types/vulnerability';
 import { autoFixVulnerability } from '../core/autoFixVulnerability';
 import { saveStatuses } from '../core/statusStore';
+import { isProtectedFile } from '../utils/protectedFiles';
 
 /**
  * Shows batch opportunities and handles user choice
@@ -103,6 +104,11 @@ async function processSingleBatch(batchGroup: BatchGroup): Promise<boolean> {
  */
 async function executeBatchFix(batchGroup: BatchGroup): Promise<boolean> {
     const { filePath, vulnType, vulnerabilities } = batchGroup;
+
+    if (isProtectedFile(filePath)) {
+        showError(`Protected file blocked from AI modification: ${filePath}`);
+        return false;
+    }
 
     try {
         // Generate batch prompt
