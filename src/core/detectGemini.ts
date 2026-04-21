@@ -31,15 +31,15 @@ const DEFAULT_EXCLUDE = '**/{node_modules,dist,out,build,target,.git,coverage,.n
 const MAX_FILES = 25;
 const MAX_FILE_SIZE = 20_000;
 const MAX_NEIGHBORS = 3;
-const DETECTION_SNAPSHOT_FILE = '.gemini-detection.json';
+const DETECTION_SNAPSHOT_FILE = '.openai-detection.json';
 
 export async function detectVulnerabilitiesWithGemini(workspaceRoot: string): Promise<Vulnerability[]> {
     const config = vscode.workspace.getConfiguration('firstsec');
-    const apiKey = config.get<string>('geminiApiKey', '');
-    const model = config.get<string>('geminiModel', 'gemini-2.5-flash');
+    const apiKey = config.get<string>('openaiApiKey', '');
+    const model = config.get<string>('openaiModel', 'gpt-3.5-turbo');
 
     if (!apiKey) {
-        throw new Error('Gemini API key is not set in firstsec.geminiApiKey.');
+        throw new Error('OpenAI API key is not set in firstsec.openaiApiKey.');
     }
 
     const files = await collectFiles(workspaceRoot);
@@ -48,7 +48,7 @@ export async function detectVulnerabilitiesWithGemini(workspaceRoot: string): Pr
     for (const file of files) {
         const neighbors = pickNeighborFiles(file, files);
         const prompt = buildPrompt(file, neighbors);
-        const rawResponse = await callAI(prompt, 'gemini', apiKey, model, 'vulnerability-detection', file.filePath);
+        const rawResponse = await callAI(prompt, 'openai', apiKey, model, 'vulnerability-detection', file.filePath);
         const parsed = parseResponse(rawResponse);
         vulnerabilities.push(...mapFindings(parsed.vulnerabilities ?? [], file));
     }
@@ -60,7 +60,7 @@ export async function detectVulnerabilitiesWithGemini(workspaceRoot: string): Pr
 export function loadDetectionSnapshot(workspaceRoot: string): Vulnerability[] {
     const snapshotPath = getDetectionSnapshotPath(workspaceRoot);
     if (!fs.existsSync(snapshotPath)) {
-        throw new Error('No Gemini detection snapshot found. Run detection first.');
+        throw new Error('No OpenAI detection snapshot found. Run detection first.');
     }
 
     try {
@@ -68,7 +68,7 @@ export function loadDetectionSnapshot(workspaceRoot: string): Vulnerability[] {
         const parsed = JSON.parse(raw) as { vulnerabilities?: Vulnerability[] };
         return Array.isArray(parsed.vulnerabilities) ? parsed.vulnerabilities : [];
     } catch (error) {
-        throw new Error(`Failed to load Gemini detection snapshot: ${(error as Error).message}`);
+        throw new Error(`Failed to load OpenAI detection snapshot: ${(error as Error).message}`);
     }
 }
 
@@ -213,7 +213,7 @@ function parseResponse(rawResponse: string): GeminiDetectionResponse {
     try {
         return JSON.parse(trimmed) as GeminiDetectionResponse;
     } catch (error) {
-        throw new Error(`Gemini detection returned invalid JSON: ${(error as Error).message}`);
+        throw new Error(`OpenAI detection returned invalid JSON: ${(error as Error).message}`);
     }
 }
 

@@ -11,7 +11,7 @@ export function setLastDetectionContext(root: string) {
 
 export async function refreshVulnerabilities(provider: any, setVulnerabilities: any, resetAutoFixCount: any, setTotalVulns: any) {
     if (!lastWorkspaceRoot) {
-        showError('No Gemini detection has been run yet.');
+        showError('No OpenAI detection has been run yet.');
         return;
     }
     try {
@@ -27,12 +27,12 @@ export async function refreshVulnerabilities(provider: any, setVulnerabilities: 
             }
         }
         provider.setVulnerabilities(vulns);
-        showInfo(`Refreshed ${vulns.length} vulnerabilities from the last Gemini snapshot.`);
+        showInfo(`Refreshed ${vulns.length} vulnerabilities from the last OpenAI snapshot.`);
         resetAutoFixCount();
         setTotalVulns(vulns.length);
         // Reset status filter to 'all'
         setStatusFilter('all');
     } catch (e: any) {
-        showError('Failed to refresh Gemini snapshot: ' + (e.message || e));
+        showError('Failed to refresh OpenAI snapshot: ' + (e.message || e));
     }
 }

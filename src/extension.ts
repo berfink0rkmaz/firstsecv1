@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { detectVulnerabilitiesWithGemini } from './core/detectGemini';
+import { detectVulnerabilitiesWithGemini as detectVulnerabilitiesWithOpenAI } from './core/detectGemini';
 import { showError, showInfo } from './utils/errorHandler';
 import { autoFixAll } from './commands/autoFixAll';
 import { autoFixSelected } from './commands/autoFixSelected';
@@ -22,15 +22,15 @@ export function activate(context: vscode.ExtensionContext) {
         canSelectMany: true
     });
 
-    async function runGeminiScan() {
+    async function runOpenAIScan() {
         const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
         if (!workspaceRoot) {
-            showError('Open a workspace folder before running Gemini detection.');
+            showError('Open a workspace folder before running OpenAI detection.');
             return;
         }
 
         setLastDetectionContext(workspaceRoot);
-        const vulns = await detectVulnerabilitiesWithGemini(workspaceRoot);
+        const vulns = await detectVulnerabilitiesWithOpenAI(workspaceRoot);
         const statusMap = loadStatuses(workspaceRoot);
         for (const v of vulns) {
             const key = getVulnerabilityStatusKey(v);
@@ -43,7 +43,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         provider.setVulnerabilities(vulns);
-        showInfo(`Detected ${vulns.length} vulnerabilities with Gemini.`);
+        showInfo(`Detected ${vulns.length} vulnerabilities with OpenAI.`);
         resetAutoFixCount();
         setTotalVulns(vulns.length);
 
@@ -64,16 +64,16 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('firstsec.loadScanReport', async () => {
             try {
-                await runGeminiScan();
+                await runOpenAIScan();
             } catch (e: any) {
-                showError('Failed to detect vulnerabilities with Gemini: ' + (e.message || e));
+                showError('Failed to detect vulnerabilities with OpenAI: ' + (e.message || e));
             }
         }),
         vscode.commands.registerCommand('firstsec.rescanWithGemini', async () => {
             try {
-                await runGeminiScan();
+                await runOpenAIScan();
             } catch (e: any) {
-                showError('Failed to rescan vulnerabilities with Gemini: ' + (e.message || e));
+                showError('Failed to rescan vulnerabilities with OpenAI: ' + (e.message || e));
             }
         }),
         vscode.commands.registerCommand('firstsec.refreshVulnerabilities', async () => {
