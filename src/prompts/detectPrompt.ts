@@ -84,6 +84,70 @@ ${neighborSection}
 `.trim();
 }
 
+export function generateSelectionDetectionPrompt(
+    primaryFile: PromptFile,
+    selectedSnippet: string,
+    selectionStartLine: number
+): string {
+    return `
+You are a senior application security reviewer.
+
+Your task is to detect real security vulnerabilities in the PRIMARY_SELECTION.
+You are also given the FULL_FILE as supporting context.
+
+Scanning strategy:
+- Focus on the PRIMARY_SELECTION first.
+- Use FULL_FILE to understand surrounding validation, authorization, data flow, and dangerous sinks.
+- This is a selection-focused review, not a whole-project review.
+
+Important rules:
+- Only report vulnerabilities that exist in the PRIMARY_SELECTION.
+- Do not report findings that belong only to other parts of the file.
+- Prefer high-confidence findings over speculative ones.
+- If something is uncertain, do not report it.
+- Do not return prose, markdown, explanations, or code fences.
+- Return strict JSON only.
+
+Return exactly this JSON schema:
+{
+  "vulnerabilities": [
+    {
+      "category": "string",
+      "filePath": "string",
+      "line": 1,
+      "severity": "Critical|High|Medium|Low",
+      "abstract": "string",
+      "codeSnippet": "string"
+    }
+  ]
+}
+
+Output rules:
+- filePath must always be the PRIMARY_FILE path exactly as provided.
+- line must be a line number inside the PRIMARY_SELECTION, where line 1 is the first selected line.
+- category must be a stable vulnerability type label.
+- abstract must be concise and specific.
+- codeSnippet must be the smallest relevant snippet from the PRIMARY_SELECTION.
+- If there are no real vulnerabilities, return:
+  {"vulnerabilities":[]}
+
+PRIMARY_FILE:
+Path: ${primaryFile.filePath}
+Language: ${primaryFile.language}
+
+PRIMARY_SELECTION:
+Starts at line: ${selectionStartLine}
+Code:
+${selectedSnippet}
+
+FULL_FILE:
+Path: ${primaryFile.filePath}
+Language: ${primaryFile.language}
+Code:
+${primaryFile.content}
+`.trim();
+}
+
 function formatFileBlock(file: PromptFile): string {
     return [
         `- Path: ${file.filePath}`,

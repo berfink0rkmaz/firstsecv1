@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { callAI } from '../api/gemini';
-import { generateDetectionPrompt } from '../prompts/detectPrompt';
+import { generateDetectionPrompt, generateSelectionDetectionPrompt } from '../prompts/detectPrompt';
 import type { Vulnerability } from '../types/vulnerability';
 import { isProtectedFile } from '../utils/protectedFiles';
 
@@ -34,13 +34,8 @@ const MAX_NEIGHBORS = 3;
 const DETECTION_SNAPSHOT_FILE = '.openai-detection.json';
 
 export async function detectVulnerabilitiesWithGemini(workspaceRoot: string): Promise<Vulnerability[]> {
-    const config = vscode.workspace.getConfiguration('firstsec');
-    const apiKey = config.get<string>('openaiApiKey', '');
-    const model = config.get<string>('openaiModel', 'gpt-3.5-turbo');
-
-    if (!apiKey) {
-        throw new Error('OpenAI API key is not set in firstsec.openaiApiKey.');
-    }
+    const apiKey = getApiKey();
+    const model = getModel();
 
     const files = await collectFiles(workspaceRoot);
     const vulnerabilities: Vulnerability[] = [];
@@ -52,6 +47,50 @@ export async function detectVulnerabilitiesWithGemini(workspaceRoot: string): Pr
         const parsed = parseResponse(rawResponse);
         vulnerabilities.push(...mapFindings(parsed.vulnerabilities ?? [], file));
     }
+
+    saveDetectionSnapshot(workspaceRoot, vulnerabilities);
+    return vulnerabilities;
+}
+
+export async function detectVulnerabilitiesInCurrentFile(
+    workspaceRoot: string,
+    document: vscode.TextDocument
+): Promise<Vulnerability[]> {
+    const file = createScanFile(workspaceRoot, document);
+    const allFiles = await collectFiles(workspaceRoot);
+    const files = mergeScanFiles(file, allFiles);
+    const neighbors = pickNeighborFiles(file, files);
+    const prompt = buildPrompt(file, neighbors);
+    const rawResponse = await callAI(prompt, 'openai', getApiKey(), getModel(), 'vulnerability-detection', file.filePath);
+    const parsed = parseResponse(rawResponse);
+    const vulnerabilities = mapFindings(parsed.vulnerabilities ?? [], file);
+
+    saveDetectionSnapshot(workspaceRoot, vulnerabilities);
+    return vulnerabilities;
+}
+
+export async function detectVulnerabilitiesInSelection(
+    workspaceRoot: string,
+    document: vscode.TextDocument,
+    selection: vscode.Selection
+): Promise<Vulnerability[]> {
+    const file = createScanFile(workspaceRoot, document);
+    const selectedRange = expandSelectionToWholeLines(document, selection);
+    const selectedSnippet = document.getText(selectedRange).trim();
+
+    if (!selectedSnippet) {
+        return [];
+    }
+
+    const prompt = generateSelectionDetectionPrompt(file, selectedSnippet, selectedRange.start.line + 1);
+    const rawResponse = await callAI(prompt, 'openai', getApiKey(), getModel(), 'vulnerability-detection', file.filePath);
+    const parsed = parseResponse(rawResponse);
+    const vulnerabilities = mapSelectionFindings(
+        parsed.vulnerabilities ?? [],
+        file,
+        selectedRange.start.line,
+        selectedRange.end.line
+    );
 
     saveDetectionSnapshot(workspaceRoot, vulnerabilities);
     return vulnerabilities;
@@ -105,6 +144,51 @@ async function collectFiles(workspaceRoot: string): Promise<ScanFile[]> {
     }
 
     return files;
+}
+
+function createScanFile(workspaceRoot: string, document: vscode.TextDocument): ScanFile {
+    if (document.isUntitled) {
+        throw new Error('Save the file before running a security scan.');
+    }
+
+    const stat = fs.statSync(document.uri.fsPath);
+    if (!stat.isFile() || stat.size > MAX_FILE_SIZE) {
+        throw new Error(`File is too large to scan. Limit is ${MAX_FILE_SIZE} bytes.`);
+    }
+
+    const filePath = normalizePath(path.relative(workspaceRoot, document.uri.fsPath));
+    if (!filePath || filePath.startsWith('..')) {
+        throw new Error('The active file must be inside the current workspace.');
+    }
+
+    if (isProtectedFile(filePath)) {
+        throw new Error(`Protected file cannot be scanned with AI: ${filePath}`);
+    }
+
+    return {
+        filePath,
+        absolutePath: document.uri.fsPath,
+        language: inferLanguage(filePath),
+        content: document.getText()
+    };
+}
+
+function mergeScanFiles(target: ScanFile, allFiles: ScanFile[]): ScanFile[] {
+    return [target, ...allFiles.filter(file => file.filePath !== target.filePath)];
+}
+
+function expandSelectionToWholeLines(document: vscode.TextDocument, selection: vscode.Selection): vscode.Range {
+    const startLine = selection.start.line;
+    const endLine = selection.end.character === 0 && !selection.isSingleLine
+        ? Math.max(selection.end.line - 1, selection.start.line)
+        : selection.end.line;
+
+    return new vscode.Range(
+        startLine,
+        0,
+        endLine,
+        document.lineAt(endLine).range.end.character
+    );
 }
 
 function pickNeighborFiles(target: ScanFile, allFiles: ScanFile[]): ScanFile[] {
@@ -204,6 +288,20 @@ function buildPrompt(file: ScanFile, neighbors: ScanFile[]): string {
     return generateDetectionPrompt(file, neighbors);
 }
 
+function getApiKey(): string {
+    const config = vscode.workspace.getConfiguration('firstsec');
+    const apiKey = config.get<string>('openaiApiKey', '');
+    if (!apiKey) {
+        throw new Error('OpenAI API key is not set in firstsec.openaiApiKey.');
+    }
+    return apiKey;
+}
+
+function getModel(): string {
+    const config = vscode.workspace.getConfiguration('firstsec');
+    return config.get<string>('openaiModel', 'gpt-3.5-turbo');
+}
+
 function parseResponse(rawResponse: string): GeminiDetectionResponse {
     const trimmed = rawResponse.trim()
         .replace(/^```json\s*/i, '')
@@ -237,6 +335,41 @@ function mapFindings(findings: GeminiFinding[], file: ScanFile): Vulnerability[]
             severity: normalizeSeverity(finding.severity),
             language: file.language,
             codeSnippet: asString(finding.codeSnippet) ?? lines[line - 1] ?? '',
+            abstract,
+            fullFileContent: file.content,
+            status: 'open'
+        });
+    }
+
+    return vulnerabilities;
+}
+
+function mapSelectionFindings(
+    findings: GeminiFinding[],
+    file: ScanFile,
+    startLine: number,
+    endLine: number
+): Vulnerability[] {
+    const lines = file.content.split(/\r?\n/);
+    const vulnerabilities: Vulnerability[] = [];
+
+    for (const finding of findings) {
+        const category = asString(finding.category);
+        const abstract = asString(finding.abstract);
+        const relativeLine = toLineNumber(finding.line, endLine - startLine + 1);
+
+        if (!category || !abstract || !relativeLine) {
+            continue;
+        }
+
+        const absoluteLine = Math.min(startLine + relativeLine, lines.length);
+        vulnerabilities.push({
+            category,
+            filePath: file.filePath,
+            line: absoluteLine,
+            severity: normalizeSeverity(finding.severity),
+            language: file.language,
+            codeSnippet: asString(finding.codeSnippet) ?? lines[absoluteLine - 1] ?? '',
             abstract,
             fullFileContent: file.content,
             status: 'open'

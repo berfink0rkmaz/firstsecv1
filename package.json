@@ -12,6 +12,8 @@
   "activationEvents": [
     "onCommand:firstsec.loadScanReport",
     "onCommand:firstsec.rescanWithGemini",
+    "onCommand:firstsec.scanCurrentFile",
+    "onCommand:firstsec.scanCurrentSelection",
     "onCommand:firstsec.fixAll",
     "onCommand:firstsec.fixSelected",
     "onCommand:firstsec.filterByStatus",
@@ -125,6 +127,16 @@
         "icon": "$(sync)"
       },
       {
+        "command": "firstsec.scanCurrentFile",
+        "title": "FirstSec: Scan Current File",
+        "icon": "$(file-code)"
+      },
+      {
+        "command": "firstsec.scanCurrentSelection",
+        "title": "FirstSec: Scan Current Selection",
+        "icon": "$(selection)"
+      },
+      {
         "command": "firstsec.fixAll",
         "title": "FirstSec: Auto-Fix All",
         "icon": "$(lightbulb)"
@@ -220,6 +232,13 @@
           "command": "firstsec.showCostReport",
           "when": "view == firstsecVulnerabilityExplorer",
           "group": "navigation@7"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "firstsec.scanCurrentSelection",
+          "when": "editorHasSelection",
+          "group": "navigation@1"
         }
       ],
       "view/item/context": [

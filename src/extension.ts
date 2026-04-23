@@ -1,6 +1,10 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { detectVulnerabilitiesWithGemini as detectVulnerabilitiesWithOpenAI } from './core/detectGemini';
+import {
+    detectVulnerabilitiesWithGemini as detectVulnerabilitiesWithOpenAI,
+    detectVulnerabilitiesInCurrentFile,
+    detectVulnerabilitiesInSelection
+} from './core/detectGemini';
 import { showError, showInfo } from './utils/errorHandler';
 import { autoFixAll } from './commands/autoFixAll';
 import { autoFixSelected } from './commands/autoFixSelected';
@@ -31,16 +35,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         setLastDetectionContext(workspaceRoot);
         const vulns = await detectVulnerabilitiesWithOpenAI(workspaceRoot);
-        const statusMap = loadStatuses(workspaceRoot);
-        for (const v of vulns) {
-            const key = getVulnerabilityStatusKey(v);
-            const legacyKey = getLegacyVulnerabilityStatusKey(v);
-            if (statusMap[key]) {
-                v.status = statusMap[key] as 'open' | 'fixed' | 'false_positive' | 'needs_attention';
-            } else if (statusMap[legacyKey]) {
-                v.status = statusMap[legacyKey] as 'open' | 'fixed' | 'false_positive' | 'needs_attention';
-            }
-        }
+        applyStoredStatuses(workspaceRoot, vulns);
 
         provider.setVulnerabilities(vulns);
         showInfo(`Detected ${vulns.length} vulnerabilities with OpenAI.`);
@@ -61,6 +56,65 @@ export function activate(context: vscode.ExtensionContext) {
         }
     }
 
+    async function runCurrentFileScan() {
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+        const editor = vscode.window.activeTextEditor;
+        if (!workspaceRoot) {
+            showError('Open a workspace folder before running OpenAI detection.');
+            return;
+        }
+        if (!editor) {
+            showError('Open a file before running the current file scan.');
+            return;
+        }
+
+        setLastDetectionContext(workspaceRoot);
+        const vulns = await detectVulnerabilitiesInCurrentFile(workspaceRoot, editor.document);
+        applyStoredStatuses(workspaceRoot, vulns);
+        provider.setVulnerabilities(vulns);
+        showInfo(`Detected ${vulns.length} vulnerabilities in the current file.`);
+        resetAutoFixCount();
+        setTotalVulns(vulns.length);
+    }
+
+    async function runSelectionScan() {
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+        const editor = vscode.window.activeTextEditor;
+        if (!workspaceRoot) {
+            showError('Open a workspace folder before running OpenAI detection.');
+            return;
+        }
+        if (!editor) {
+            showError('Open a file before running the selection scan.');
+            return;
+        }
+        if (editor.selection.isEmpty) {
+            showError('Select some code before running the selection scan.');
+            return;
+        }
+
+        setLastDetectionContext(workspaceRoot);
+        const vulns = await detectVulnerabilitiesInSelection(workspaceRoot, editor.document, editor.selection);
+        applyStoredStatuses(workspaceRoot, vulns);
+        provider.setVulnerabilities(vulns);
+        showInfo(`Detected ${vulns.length} vulnerabilities in the current selection.`);
+        resetAutoFixCount();
+        setTotalVulns(vulns.length);
+    }
+
+    function applyStoredStatuses(workspaceRoot: string, vulns: VulnerabilityTreeItem['vuln'][]) {
+        const statusMap = loadStatuses(workspaceRoot);
+        for (const v of vulns) {
+            const key = getVulnerabilityStatusKey(v);
+            const legacyKey = getLegacyVulnerabilityStatusKey(v);
+            if (statusMap[key]) {
+                v.status = statusMap[key] as 'open' | 'fixed' | 'false_positive' | 'needs_attention';
+            } else if (statusMap[legacyKey]) {
+                v.status = statusMap[legacyKey] as 'open' | 'fixed' | 'false_positive' | 'needs_attention';
+            }
+        }
+    }
+
     context.subscriptions.push(
         vscode.commands.registerCommand('firstsec.loadScanReport', async () => {
             try {
@@ -74,6 +128,20 @@ export function activate(context: vscode.ExtensionContext) {
                 await runOpenAIScan();
             } catch (e: any) {
                 showError('Failed to rescan vulnerabilities with OpenAI: ' + (e.message || e));
+            }
+        }),
+        vscode.commands.registerCommand('firstsec.scanCurrentFile', async () => {
+            try {
+                await runCurrentFileScan();
+            } catch (e: any) {
+                showError('Failed to scan the current file with OpenAI: ' + (e.message || e));
+            }
+        }),
+        vscode.commands.registerCommand('firstsec.scanCurrentSelection', async () => {
+            try {
+                await runSelectionScan();
+            } catch (e: any) {
+                showError('Failed to scan the current selection with OpenAI: ' + (e.message || e));
             }
         }),
         vscode.commands.registerCommand('firstsec.refreshVulnerabilities', async () => {
