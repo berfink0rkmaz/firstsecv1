@@ -11,7 +11,7 @@
   ],
   "activationEvents": [
     "onCommand:firstsec.loadScanReport",
-    "onCommand:firstsec.rescanWithGemini",
+    "onCommand:firstsec.rescanWithOpenAI",
     "onCommand:firstsec.scanCurrentFile",
     "onCommand:firstsec.scanCurrentSelection",
     "onCommand:firstsec.fixAll",
@@ -122,7 +122,7 @@
         "icon": "$(search)"
       },
       {
-        "command": "firstsec.rescanWithGemini",
+        "command": "firstsec.rescanWithOpenAI",
         "title": "Rescan with OpenAI",
         "icon": "$(sync)"
       },
@@ -214,7 +214,7 @@
           "group": "navigation@3"
         },
         {
-          "command": "firstsec.rescanWithGemini",
+          "command": "firstsec.rescanWithOpenAI",
           "when": "view == firstsecVulnerabilityExplorer",
           "group": "navigation@4"
         },

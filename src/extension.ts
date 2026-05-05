@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import {
-    detectVulnerabilitiesWithGemini as detectVulnerabilitiesWithOpenAI,
+    detectVulnerabilitiesWithOpenAI,
     detectVulnerabilitiesInCurrentFile,
     detectVulnerabilitiesInSelection
 } from './core/detectGemini';
@@ -123,7 +123,7 @@ export function activate(context: vscode.ExtensionContext) {
                 showError('Failed to detect vulnerabilities with OpenAI: ' + (e.message || e));
             }
         }),
-        vscode.commands.registerCommand('firstsec.rescanWithGemini', async () => {
+        vscode.commands.registerCommand('firstsec.rescanWithOpenAI', async () => {
             try {
                 await runOpenAIScan();
             } catch (e: any) {

@@ -5491,11 +5491,11 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode14 = __toESM(require("vscode"));
+var vscode15 = __toESM(require("vscode"));
 var path7 = __toESM(require("path"));
 
 // src/core/detectGemini.ts
-var vscode2 = __toESM(require("vscode"));
+var vscode3 = __toESM(require("vscode"));
 var fs3 = __toESM(require("fs"));
 var path2 = __toESM(require("path"));
 
@@ -7151,6 +7151,65 @@ NEIGHBOR_FILES:
 ${neighborSection}
 `.trim();
 }
+function generateSelectionDetectionPrompt(primaryFile, selectedSnippet, selectionStartLine) {
+  return `
+You are a senior application security reviewer.
+
+Your task is to detect real security vulnerabilities in the PRIMARY_SELECTION.
+You are also given the FULL_FILE as supporting context.
+
+Scanning strategy:
+- Focus on the PRIMARY_SELECTION first.
+- Use FULL_FILE to understand surrounding validation, authorization, data flow, and dangerous sinks.
+- This is a selection-focused review, not a whole-project review.
+
+Important rules:
+- Only report vulnerabilities that exist in the PRIMARY_SELECTION.
+- Do not report findings that belong only to other parts of the file.
+- Prefer high-confidence findings over speculative ones.
+- If something is uncertain, do not report it.
+- Do not return prose, markdown, explanations, or code fences.
+- Return strict JSON only.
+
+Return exactly this JSON schema:
+{
+  "vulnerabilities": [
+    {
+      "category": "string",
+      "filePath": "string",
+      "line": 1,
+      "severity": "Critical|High|Medium|Low",
+      "abstract": "string",
+      "codeSnippet": "string"
+    }
+  ]
+}
+
+Output rules:
+- filePath must always be the PRIMARY_FILE path exactly as provided.
+- line must be a line number inside the PRIMARY_SELECTION, where line 1 is the first selected line.
+- category must be a stable vulnerability type label.
+- abstract must be concise and specific.
+- codeSnippet must be the smallest relevant snippet from the PRIMARY_SELECTION.
+- If there are no real vulnerabilities, return:
+  {"vulnerabilities":[]}
+
+PRIMARY_FILE:
+Path: ${primaryFile.filePath}
+Language: ${primaryFile.language}
+
+PRIMARY_SELECTION:
+Starts at line: ${selectionStartLine}
+Code:
+${selectedSnippet}
+
+FULL_FILE:
+Path: ${primaryFile.filePath}
+Language: ${primaryFile.language}
+Code:
+${primaryFile.content}
+`.trim();
+}
 function formatFileBlock(file) {
   return [
     `- Path: ${file.filePath}`,
@@ -7163,47 +7222,98 @@ function indentBlock(value, prefix) {
   return value.split(/\r?\n/).map((line) => `${prefix}${line}`).join("\n");
 }
 
+// src/utils/protectedFiles.ts
+var vscode2 = __toESM(require("vscode"));
+function escapeRegex(value) {
+  return value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&");
+}
+function globToRegExp(pattern) {
+  const normalized = pattern.replace(/\\/g, "/");
+  const placeholder = "\0";
+  let regex = escapeRegex(normalized);
+  regex = regex.replace(/\*\*/g, placeholder);
+  regex = regex.replace(/\*/g, "[^/]*");
+  regex = regex.replace(new RegExp(placeholder, "g"), ".*");
+  return new RegExp(`^${regex}$`);
+}
+function getProtectedFilePatterns() {
+  const config2 = vscode2.workspace.getConfiguration("firstsec");
+  return config2.get("protectedFiles", []);
+}
+function isProtectedFile(filePath) {
+  const normalizedPath = filePath.replace(/\\/g, "/");
+  const patterns = getProtectedFilePatterns();
+  return patterns.some((pattern) => globToRegExp(pattern).test(normalizedPath));
+}
+
 // src/core/detectGemini.ts
 var DEFAULT_INCLUDE = "**/*.{js,jsx,ts,tsx,java,py,cs,go,php,rb,kt,kts,scala,swift,c,cc,cpp,h,hpp}";
 var DEFAULT_EXCLUDE = "**/{node_modules,dist,out,build,target,.git,coverage,.next,.nuxt,vendor}/**";
 var MAX_FILES = 25;
 var MAX_FILE_SIZE = 2e4;
 var MAX_NEIGHBORS = 3;
-var DETECTION_SNAPSHOT_FILE = ".gemini-detection.json";
-async function detectVulnerabilitiesWithGemini(workspaceRoot) {
-  const config2 = vscode2.workspace.getConfiguration("firstsec");
-  const apiKey = config2.get("geminiApiKey", "");
-  const model = config2.get("geminiModel", "gemini-2.5-flash");
-  if (!apiKey) {
-    throw new Error("Gemini API key is not set in firstsec.geminiApiKey.");
-  }
+var DETECTION_SNAPSHOT_FILE = ".openai-detection.json";
+async function detectVulnerabilitiesWithOpenAI(workspaceRoot) {
+  const apiKey = getApiKey();
+  const model = getModel();
   const files = await collectFiles(workspaceRoot);
   const vulnerabilities = [];
   for (const file of files) {
     const neighbors = pickNeighborFiles(file, files);
     const prompt = buildPrompt(file, neighbors);
-    const rawResponse = await callAI(prompt, "gemini", apiKey, model, "vulnerability-detection", file.filePath);
+    const rawResponse = await callAI(prompt, "openai", apiKey, model, "vulnerability-detection", file.filePath);
     const parsed = parseResponse(rawResponse);
     vulnerabilities.push(...mapFindings(parsed.vulnerabilities ?? [], file));
   }
   saveDetectionSnapshot(workspaceRoot, vulnerabilities);
   return vulnerabilities;
 }
+async function detectVulnerabilitiesInCurrentFile(workspaceRoot, document) {
+  const file = createScanFile(workspaceRoot, document);
+  const allFiles = await collectFiles(workspaceRoot);
+  const files = mergeScanFiles(file, allFiles);
+  const neighbors = pickNeighborFiles(file, files);
+  const prompt = buildPrompt(file, neighbors);
+  const rawResponse = await callAI(prompt, "openai", getApiKey(), getModel(), "vulnerability-detection", file.filePath);
+  const parsed = parseResponse(rawResponse);
+  const vulnerabilities = mapFindings(parsed.vulnerabilities ?? [], file);
+  saveDetectionSnapshot(workspaceRoot, vulnerabilities);
+  return vulnerabilities;
+}
+async function detectVulnerabilitiesInSelection(workspaceRoot, document, selection) {
+  const file = createScanFile(workspaceRoot, document);
+  const selectedRange = expandSelectionToWholeLines(document, selection);
+  const selectedSnippet = document.getText(selectedRange).trim();
+  if (!selectedSnippet) {
+    return [];
+  }
+  const prompt = generateSelectionDetectionPrompt(file, selectedSnippet, selectedRange.start.line + 1);
+  const rawResponse = await callAI(prompt, "openai", getApiKey(), getModel(), "vulnerability-detection", file.filePath);
+  const parsed = parseResponse(rawResponse);
+  const vulnerabilities = mapSelectionFindings(
+    parsed.vulnerabilities ?? [],
+    file,
+    selectedRange.start.line,
+    selectedRange.end.line
+  );
+  saveDetectionSnapshot(workspaceRoot, vulnerabilities);
+  return vulnerabilities;
+}
 function loadDetectionSnapshot(workspaceRoot) {
   const snapshotPath = getDetectionSnapshotPath(workspaceRoot);
   if (!fs3.existsSync(snapshotPath)) {
-    throw new Error("No Gemini detection snapshot found. Run detection first.");
+    throw new Error("No OpenAI detection snapshot found. Run detection first.");
   }
   try {
     const raw = fs3.readFileSync(snapshotPath, "utf-8");
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed.vulnerabilities) ? parsed.vulnerabilities : [];
   } catch (error) {
-    throw new Error(`Failed to load Gemini detection snapshot: ${error.message}`);
+    throw new Error(`Failed to load OpenAI detection snapshot: ${error.message}`);
   }
 }
 async function collectFiles(workspaceRoot) {
-  const uris = await vscode2.workspace.findFiles(DEFAULT_INCLUDE, DEFAULT_EXCLUDE, MAX_FILES * 3);
+  const uris = await vscode3.workspace.findFiles(DEFAULT_INCLUDE, DEFAULT_EXCLUDE, MAX_FILES * 3);
   const files = [];
   for (const uri of uris) {
     if (files.length >= MAX_FILES) {
@@ -7217,6 +7327,9 @@ async function collectFiles(workspaceRoot) {
     if (!filePath || filePath.startsWith("..")) {
       continue;
     }
+    if (isProtectedFile(filePath)) {
+      continue;
+    }
     const content = fs3.readFileSync(uri.fsPath, "utf-8");
     files.push({
       filePath,
@@ -7226,6 +7339,41 @@ async function collectFiles(workspaceRoot) {
     });
   }
   return files;
+}
+function createScanFile(workspaceRoot, document) {
+  if (document.isUntitled) {
+    throw new Error("Save the file before running a security scan.");
+  }
+  const stat2 = fs3.statSync(document.uri.fsPath);
+  if (!stat2.isFile() || stat2.size > MAX_FILE_SIZE) {
+    throw new Error(`File is too large to scan. Limit is ${MAX_FILE_SIZE} bytes.`);
+  }
+  const filePath = normalizePath(path2.relative(workspaceRoot, document.uri.fsPath));
+  if (!filePath || filePath.startsWith("..")) {
+    throw new Error("The active file must be inside the current workspace.");
+  }
+  if (isProtectedFile(filePath)) {
+    throw new Error(`Protected file cannot be scanned with AI: ${filePath}`);
+  }
+  return {
+    filePath,
+    absolutePath: document.uri.fsPath,
+    language: inferLanguage(filePath),
+    content: document.getText()
+  };
+}
+function mergeScanFiles(target, allFiles) {
+  return [target, ...allFiles.filter((file) => file.filePath !== target.filePath)];
+}
+function expandSelectionToWholeLines(document, selection) {
+  const startLine = selection.start.line;
+  const endLine = selection.end.character === 0 && !selection.isSingleLine ? Math.max(selection.end.line - 1, selection.start.line) : selection.end.line;
+  return new vscode3.Range(
+    startLine,
+    0,
+    endLine,
+    document.lineAt(endLine).range.end.character
+  );
 }
 function pickNeighborFiles(target, allFiles) {
   const selected = [];
@@ -7311,12 +7459,24 @@ function resolveImport(sourcePath, importPath, allFiles) {
 function buildPrompt(file, neighbors) {
   return generateDetectionPrompt(file, neighbors);
 }
+function getApiKey() {
+  const config2 = vscode3.workspace.getConfiguration("firstsec");
+  const apiKey = config2.get("openaiApiKey", "");
+  if (!apiKey) {
+    throw new Error("OpenAI API key is not set in firstsec.openaiApiKey.");
+  }
+  return apiKey;
+}
+function getModel() {
+  const config2 = vscode3.workspace.getConfiguration("firstsec");
+  return config2.get("openaiModel", "gpt-3.5-turbo");
+}
 function parseResponse(rawResponse) {
   const trimmed = rawResponse.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "");
   try {
     return JSON.parse(trimmed);
   } catch (error) {
-    throw new Error(`Gemini detection returned invalid JSON: ${error.message}`);
+    throw new Error(`OpenAI detection returned invalid JSON: ${error.message}`);
   }
 }
 function mapFindings(findings, file) {
@@ -7336,6 +7496,31 @@ function mapFindings(findings, file) {
       severity: normalizeSeverity(finding.severity),
       language: file.language,
       codeSnippet: asString(finding.codeSnippet) ?? lines[line - 1] ?? "",
+      abstract,
+      fullFileContent: file.content,
+      status: "open"
+    });
+  }
+  return vulnerabilities;
+}
+function mapSelectionFindings(findings, file, startLine, endLine) {
+  const lines = file.content.split(/\r?\n/);
+  const vulnerabilities = [];
+  for (const finding of findings) {
+    const category = asString(finding.category);
+    const abstract = asString(finding.abstract);
+    const relativeLine = toLineNumber(finding.line, endLine - startLine + 1);
+    if (!category || !abstract || !relativeLine) {
+      continue;
+    }
+    const absoluteLine = Math.min(startLine + relativeLine, lines.length);
+    vulnerabilities.push({
+      category,
+      filePath: file.filePath,
+      line: absoluteLine,
+      severity: normalizeSeverity(finding.severity),
+      language: file.language,
+      codeSnippet: asString(finding.codeSnippet) ?? lines[absoluteLine - 1] ?? "",
       abstract,
       fullFileContent: file.content,
       status: "open"
@@ -7387,18 +7572,18 @@ function getDetectionSnapshotPath(workspaceRoot) {
 }
 
 // src/utils/errorHandler.ts
-var vscode3 = __toESM(require("vscode"));
+var vscode4 = __toESM(require("vscode"));
 function showError(message, error) {
   if (error) {
     console.error(message, error);
   }
-  vscode3.window.showErrorMessage(message);
+  vscode4.window.showErrorMessage(message);
 }
 function showInfo(message) {
-  vscode3.window.showInformationMessage(message);
+  vscode4.window.showInformationMessage(message);
 }
 function showWarning(message) {
-  vscode3.window.showWarningMessage(message);
+  vscode4.window.showWarningMessage(message);
 }
 function handleGeminiError(error) {
   const errorMsg = error.message || String(error);
@@ -7610,7 +7795,7 @@ function getSecuritySummary(filePaths) {
 }
 
 // src/commands/batchFix.ts
-var vscode6 = __toESM(require("vscode"));
+var vscode7 = __toESM(require("vscode"));
 init_batchProcessor();
 
 // src/prompts/batchPrompt.ts
@@ -7677,7 +7862,7 @@ function getFileExtension(filePath) {
 }
 
 // src/core/autoFixVulnerability.ts
-var vscode5 = __toESM(require("vscode"));
+var vscode6 = __toESM(require("vscode"));
 
 // src/prompts/severityLevelPrompt.ts
 function generatePrompt(issue) {
@@ -7727,9 +7912,9 @@ Respond in the following format (only return actual Java code in blocks, no extr
 }
 
 // src/git.ts
-var vscode4 = __toESM(require("vscode"));
+var vscode5 = __toESM(require("vscode"));
 async function commitAndPush() {
-  const gitExtension = vscode4.extensions.getExtension("vscode.git")?.exports;
+  const gitExtension = vscode5.extensions.getExtension("vscode.git")?.exports;
   const api = gitExtension?.getAPI(1);
   const repo = api?.repositories?.[0];
   if (!repo) {
@@ -7818,15 +8003,19 @@ function resetAutoFixCount() {
   autoFixCount = 0;
 }
 async function autoFixVulnerability(vuln, provider, dryRun) {
-  const fileUri = vscode5.Uri.file(require("path").resolve(vscode5.workspace.workspaceFolders?.[0]?.uri.fsPath || "", vuln.filePath));
-  const document = await vscode5.workspace.openTextDocument(fileUri);
-  const editor = await vscode5.window.showTextDocument(document);
+  if (isProtectedFile(vuln.filePath)) {
+    showError(`Protected file blocked from AI access: ${vuln.filePath}`);
+    return null;
+  }
+  const fileUri = vscode6.Uri.file(require("path").resolve(vscode6.workspace.workspaceFolders?.[0]?.uri.fsPath || "", vuln.filePath));
+  const document = await vscode6.workspace.openTextDocument(fileUri);
+  const editor = await vscode6.window.showTextDocument(document);
   const lineIndex = vuln.line - 1;
   if (lineIndex < 0 || lineIndex >= document.lineCount) {
     showError("Invalid line number for auto-fix.");
     return null;
   }
-  const config2 = vscode5.workspace.getConfiguration("firstsec");
+  const config2 = vscode6.workspace.getConfiguration("firstsec");
   const persona = config2.get("aiPersona", "strictFixer");
   const personaInstructions = {
     strictFixer: "Only provide the corrected code for the detected security issue. Do not include any explanation, comments, or reasoning.",
@@ -7868,7 +8057,7 @@ ${generatePrompt({
     aiResponse = await callAI(prompt, providerStr, apiKey, model, "auto-fix", vuln.filePath);
   } catch (err) {
     const errorMsg = err.message || String(err);
-    const output = vscode5.window.createOutputChannel("Security AI Fix Preview");
+    const output = vscode6.window.createOutputChannel("Security AI Fix Preview");
     output.clear();
     output.appendLine(`AI API error for ${vuln.filePath}:${vuln.line}`);
     output.appendLine(errorMsg);
@@ -7904,9 +8093,13 @@ These files contain sensitive configuration, credentials, or system files that s
   }
   const fileChanges = {};
   for (const block of allBlocks) {
-    const filePath = block.filePath;
+    const filePath = block.filePath === vuln.filePath || path5.basename(block.filePath) === path5.basename(vuln.filePath) ? vuln.filePath : block.filePath;
+    if (isProtectedFile(filePath)) {
+      showError(`Protected file blocked from AI modification: ${filePath}`);
+      return null;
+    }
     const aiCode = block.aiCode;
-    const absPath = path5.isAbsolute(filePath) ? filePath : path5.join(vscode5.workspace.workspaceFolders?.[0]?.uri.fsPath || "", filePath);
+    const absPath = path5.isAbsolute(filePath) ? filePath : path5.join(vscode6.workspace.workspaceFolders?.[0]?.uri.fsPath || "", filePath);
     let origContent = "";
     let language = filePath.split(".").pop() || "txt";
     let lineIndex2 = void 0;
@@ -7945,7 +8138,7 @@ These files contain sensitive configuration, credentials, or system files that s
   const securityWarning = securitySummary ? `
 
 ${securitySummary}` : "";
-  const proceed = await vscode5.window.showInformationMessage(
+  const proceed = await vscode6.window.showInformationMessage(
     `Gemini AI suggests fixes for the following file(s):
 ${fileList}${securityWarning}
 Proceed to review each fix?`,
@@ -7962,7 +8155,7 @@ Proceed to review each fix?`,
     const { origContent, aiContent, language } = fileChanges[filePath];
     const securityCheck = checkFileSecurity(filePath);
     if (securityCheck.isSensitive) {
-      const warningResult = await vscode5.window.showWarningMessage(
+      const warningResult = await vscode6.window.showWarningMessage(
         securityCheck.warningMessage || `Security warning for ${filePath}`,
         "Continue Anyway",
         "Skip This File"
@@ -7976,19 +8169,19 @@ Proceed to review each fix?`,
     let leftContent = origContent;
     if (!origContent) {
       leftContent = "// [File not found: original file does not exist]";
-      vscode5.window.showWarningMessage(`Original file not found for ${filePath}. The left side of the diff will be empty.`);
+      vscode6.window.showWarningMessage(`Original file not found for ${filePath}. The left side of the diff will be empty.`);
     }
     const origLinesCount = origContent ? origContent.split(/\r?\n/).length : 0;
     const aiLinesCount = aiContent.split(/\r?\n/).length;
     if (origLinesCount > 0 && aiLinesCount < origLinesCount * 0.5) {
-      vscode5.window.showWarningMessage(`AI's suggestion for ${filePath} is much shorter than the original. Please review carefully before accepting.`);
+      vscode6.window.showWarningMessage(`AI's suggestion for ${filePath} is much shorter than the original. Please review carefully before accepting.`);
     }
     fs5.writeFileSync(origPath, leftContent, "utf-8");
     fs5.writeFileSync(aiPath, aiContent, "utf-8");
-    const origUri = vscode5.Uri.file(origPath);
-    const aiUri = vscode5.Uri.file(aiPath);
-    await vscode5.commands.executeCommand("vscode.diff", origUri, aiUri, `AI Fix Preview: ${filePath}`);
-    const userChoice = await vscode5.window.showQuickPick(["Accept", "Reject"], {
+    const origUri = vscode6.Uri.file(origPath);
+    const aiUri = vscode6.Uri.file(aiPath);
+    await vscode6.commands.executeCommand("vscode.diff", origUri, aiUri, `AI Fix Preview: ${filePath}`);
+    const userChoice = await vscode6.window.showQuickPick(["Accept", "Reject"], {
       placeHolder: `Apply AI fix for ${filePath}?`
     });
     try {
@@ -8008,8 +8201,12 @@ Proceed to review each fix?`,
     return null;
   }
   for (const filePath of acceptedFiles) {
+    if (isProtectedFile(filePath)) {
+      showError(`Protected file blocked from AI modification: ${filePath}`);
+      continue;
+    }
     const { aiContent } = fileChanges[filePath];
-    const absPath = path5.isAbsolute(filePath) ? filePath : path5.join(vscode5.workspace.workspaceFolders?.[0]?.uri.fsPath || "", filePath);
+    const absPath = path5.isAbsolute(filePath) ? filePath : path5.join(vscode6.workspace.workspaceFolders?.[0]?.uri.fsPath || "", filePath);
     try {
       fs5.writeFileSync(absPath, aiContent, "utf-8");
     } catch (err) {
@@ -8019,20 +8216,20 @@ Proceed to review each fix?`,
   showInfo(`AI auto-fixed vulnerability at ${vuln.filePath}:${vuln.line} and applied changes to accepted files.`);
   vuln.status = "fixed";
   if (provider) {
-    const workspaceRoot = vscode5.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+    const workspaceRoot = vscode6.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
     saveStatuses(provider.getAllVulnerabilities(), workspaceRoot);
   }
   autoFixCount++;
   const commitFrequency = config2.get("commitFrequency", 3);
   if (autoFixCount % commitFrequency === 0 || autoFixCount === totalVulns) {
-    const result = await vscode5.window.showInformationMessage(
+    const result = await vscode6.window.showInformationMessage(
       `You have auto-fixed ${autoFixCount} vulnerabilities. What would you like to do?`,
       "Commit",
       "Commit and Push",
       "Cancel"
     );
     if (result === "Commit") {
-      const gitExtension = vscode5.extensions.getExtension("vscode.git")?.exports;
+      const gitExtension = vscode6.extensions.getExtension("vscode.git")?.exports;
       const api = gitExtension?.getAPI(1);
       const repo = api?.repositories?.[0];
       if (!repo) {
@@ -8063,7 +8260,7 @@ async function showBatchOpportunities(vulnerabilities) {
   }
   const opportunity = detectBatchOpportunities(vulnerabilities);
   const message = `Found ${opportunity.totalBatches} batch opportunities for ${opportunity.totalVulnerabilities} vulnerabilities.`;
-  const choice = await vscode6.window.showInformationMessage(
+  const choice = await vscode7.window.showInformationMessage(
     message,
     "Fix Together",
     "Fix Individually",
@@ -8081,7 +8278,7 @@ async function processBatchFixes(batchGroups) {
   let totalGroups = batchGroups.length;
   for (const [index, group] of batchGroups.entries()) {
     const progressMessage = `Processing batch ${index + 1}/${totalGroups}: ${group.filePath}`;
-    vscode6.window.showInformationMessage(progressMessage);
+    vscode7.window.showInformationMessage(progressMessage);
     try {
       const success = await processSingleBatch(group);
       if (success) {
@@ -8103,7 +8300,7 @@ async function processBatchFixes(batchGroups) {
 async function processSingleBatch(batchGroup) {
   const { filePath, vulnType, vulnerabilities } = batchGroup;
   const confirmationMessage = `${filePath} - ${vulnType} (${vulnerabilities.length} vulnerabilities)`;
-  const choice = await vscode6.window.showInformationMessage(
+  const choice = await vscode7.window.showInformationMessage(
     `Ready to process: ${confirmationMessage}`,
     "Process This Batch",
     "Skip This Batch",
@@ -8122,9 +8319,13 @@ async function processSingleBatch(batchGroup) {
 }
 async function executeBatchFix(batchGroup) {
   const { filePath, vulnType, vulnerabilities } = batchGroup;
+  if (isProtectedFile(filePath)) {
+    showError(`Protected file blocked from AI modification: ${filePath}`);
+    return false;
+  }
   try {
     const prompt = generateBatchPrompt(batchGroup);
-    const config2 = vscode6.workspace.getConfiguration("firstsec");
+    const config2 = vscode7.workspace.getConfiguration("firstsec");
     const providerStr = config2.get("aiProvider", "gemini");
     let apiKey = "";
     let model = "";
@@ -8148,7 +8349,7 @@ async function executeBatchFix(batchGroup) {
     );
     const success = await processBatchAIResponse(aiResponse, batchGroup);
     if (success) {
-      const workspaceRoot = vscode6.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+      const workspaceRoot = vscode7.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
       for (const vuln of vulnerabilities) {
         vuln.status = "fixed";
       }
@@ -8164,7 +8365,7 @@ async function executeBatchFix(batchGroup) {
 }
 async function processBatchAIResponse(aiResponse, batchGroup) {
   const { filePath, vulnType, vulnerabilities } = batchGroup;
-  const output = vscode6.window.createOutputChannel("Security Batch Fix Preview");
+  const output = vscode7.window.createOutputChannel("Security Batch Fix Preview");
   output.clear();
   output.appendLine(`Batch Fix Preview for ${filePath}:`);
   output.appendLine(`Type: ${vulnType}`);
@@ -8173,7 +8374,7 @@ async function processBatchAIResponse(aiResponse, batchGroup) {
   output.appendLine("AI Response:");
   output.appendLine(aiResponse);
   output.show(true);
-  const choice = await vscode6.window.showInformationMessage(
+  const choice = await vscode7.window.showInformationMessage(
     `Review the batch fix for ${filePath}. Apply the changes?`,
     "Apply Changes",
     "Reject Changes",
@@ -8193,7 +8394,7 @@ async function processIndividualFixes(vulnerabilities) {
   const totalVulns2 = vulnerabilities.length;
   for (const [index, vuln] of vulnerabilities.entries()) {
     const progressMessage = `Processing vulnerability ${index + 1}/${totalVulns2}: ${vuln.filePath}:${vuln.line}`;
-    vscode6.window.showInformationMessage(progressMessage);
+    vscode7.window.showInformationMessage(progressMessage);
     try {
       const result = await autoFixVulnerability(vuln);
       if (result) {
@@ -8218,7 +8419,7 @@ async function showBatchOpportunityForVulnerability(targetVuln, allVulnerabiliti
   if (!batchGroup) {
     return false;
   }
-  const choice = await vscode6.window.showInformationMessage(
+  const choice = await vscode7.window.showInformationMessage(
     `Smart detection: ${batchGroup.count - 1} more ${batchGroup.vulnType} vulnerabilities in same file`,
     "Fix All Together",
     "Fix This One",
@@ -8234,7 +8435,7 @@ async function showBatchOpportunityForVulnerability(targetVuln, allVulnerabiliti
 }
 
 // src/commands/autoFixAll.ts
-var vscode7 = __toESM(require("vscode"));
+var vscode8 = __toESM(require("vscode"));
 var severityOrder = ["Critical", "High", "Medium", "Low"];
 async function autoFixAll(provider, autoFixVulnerability2) {
   let allVulns = provider.getAllVulnerabilities ? provider.getAllVulnerabilities() : provider.vulnerabilities || [];
@@ -8246,7 +8447,7 @@ async function autoFixAll(provider, autoFixVulnerability2) {
   if (batchSuccess) {
     return;
   }
-  const workspaceRoot = vscode7.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+  const workspaceRoot = vscode8.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
   for (const severity of severityOrder) {
     const group = allVulns.filter(
       (v) => v.severity === severity && v.status !== "false_positive" && v.status !== "fixed" && v.status !== "needs_attention"
@@ -8257,7 +8458,7 @@ async function autoFixAll(provider, autoFixVulnerability2) {
       const fixedCode = await autoFixVulnerability2(vuln, provider, true);
       previews.push({ vuln, fixedCode });
     }
-    const output = vscode7.window.createOutputChannel("Security AI Fix Preview");
+    const output = vscode8.window.createOutputChannel("Security AI Fix Preview");
     output.clear();
     output.appendLine(`AI suggestions for ${severity} vulnerabilities:`);
     for (const { vuln, fixedCode } of previews) {
@@ -8269,7 +8470,7 @@ async function autoFixAll(provider, autoFixVulnerability2) {
       output.appendLine("");
     }
     output.show(true);
-    const userChoice = await vscode7.window.showInformationMessage(
+    const userChoice = await vscode8.window.showInformationMessage(
       `Apply all AI fixes for ${severity} vulnerabilities?`,
       { modal: true },
       "Accept",
@@ -8288,7 +8489,7 @@ async function autoFixAll(provider, autoFixVulnerability2) {
           continue;
         }
         if (securityCheck.isSensitive) {
-          const warningResult = await vscode7.window.showWarningMessage(
+          const warningResult = await vscode8.window.showWarningMessage(
             `\u26A0\uFE0F SECURITY WARNING: ${vuln.filePath} is a sensitive file. Continue with fix?`,
             "Continue",
             "Skip"
@@ -8298,9 +8499,9 @@ async function autoFixAll(provider, autoFixVulnerability2) {
             continue;
           }
         }
-        const fileUri = vscode7.Uri.file(vuln.filePath);
-        const document = await vscode7.workspace.openTextDocument(fileUri);
-        const editor = await vscode7.window.showTextDocument(document);
+        const fileUri = vscode8.Uri.file(vuln.filePath);
+        const document = await vscode8.workspace.openTextDocument(fileUri);
+        const editor = await vscode8.window.showTextDocument(document);
         const lineIndex = vuln.line - 1;
         await editor.edit((editBuilder) => {
           editBuilder.replace(document.lineAt(lineIndex).range, fixedCode);
@@ -8316,7 +8517,7 @@ async function autoFixAll(provider, autoFixVulnerability2) {
 }
 
 // src/commands/autoFixSelected.ts
-var vscode8 = __toESM(require("vscode"));
+var vscode9 = __toESM(require("vscode"));
 async function autoFixSelected(treeView, autoFixVulnerability2, provider) {
   const selected = treeView.selection.filter((item) => item && item.vuln);
   if (!selected.length) {
@@ -8328,7 +8529,7 @@ async function autoFixSelected(treeView, autoFixVulnerability2, provider) {
   if (batchSuccess) {
     return;
   }
-  const workspaceRoot = vscode8.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+  const workspaceRoot = vscode9.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
   for (const item of selected) {
     try {
       await autoFixVulnerability2(item.vuln, provider);
@@ -8343,7 +8544,7 @@ async function autoFixSelected(treeView, autoFixVulnerability2, provider) {
 }
 
 // src/commands/markFalsePositive.ts
-var vscode9 = __toESM(require("vscode"));
+var vscode10 = __toESM(require("vscode"));
 async function markFalsePositive(treeView, provider) {
   try {
     const selected = treeView.selection.filter((item) => item && item.vuln);
@@ -8355,7 +8556,7 @@ async function markFalsePositive(treeView, provider) {
       item.vuln.status = "false_positive";
     }
     provider.refresh();
-    const workspaceRoot = vscode9.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+    const workspaceRoot = vscode10.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
     saveStatuses(provider.getAllVulnerabilities(), workspaceRoot);
     showInfo("Marked as false positive.");
   } catch (err) {
@@ -8364,7 +8565,7 @@ async function markFalsePositive(treeView, provider) {
 }
 
 // src/commands/undoFalsePositive.ts
-var vscode10 = __toESM(require("vscode"));
+var vscode11 = __toESM(require("vscode"));
 async function undoFalsePositive(treeView, provider) {
   const selected = treeView.selection.filter((item) => item && item.vuln);
   if (!selected.length) {
@@ -8377,7 +8578,7 @@ async function undoFalsePositive(treeView, provider) {
     return;
   }
   const count = falsePositiveItems.length;
-  const choice = await vscode10.window.showInformationMessage(
+  const choice = await vscode11.window.showInformationMessage(
     `Undo false positive marking for ${count} vulnerability${count > 1 ? "ies" : ""}?`,
     "Undo False Positive",
     "Cancel"
@@ -8385,7 +8586,7 @@ async function undoFalsePositive(treeView, provider) {
   if (choice !== "Undo False Positive") {
     return;
   }
-  const workspaceRoot = vscode10.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+  const workspaceRoot = vscode11.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
   let updatedCount = 0;
   for (const item of falsePositiveItems) {
     try {
@@ -8405,7 +8606,7 @@ async function undoFalsePositiveSingle(vulnerability, provider) {
     showInfo("This vulnerability is not marked as false positive.");
     return;
   }
-  const choice = await vscode10.window.showInformationMessage(
+  const choice = await vscode11.window.showInformationMessage(
     `Undo false positive marking for vulnerability at ${vulnerability.filePath}:${vulnerability.line}?`,
     "Undo False Positive",
     "Cancel"
@@ -8415,7 +8616,7 @@ async function undoFalsePositiveSingle(vulnerability, provider) {
   }
   try {
     vulnerability.status = "open";
-    const workspaceRoot = vscode10.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+    const workspaceRoot = vscode11.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
     if (provider) {
       saveStatuses(provider.getAllVulnerabilities(), workspaceRoot);
     }
@@ -8441,14 +8642,14 @@ async function showFalsePositivesForUndo(provider) {
     detail: `Severity: ${vuln.severity}`,
     vuln
   }));
-  const selected = await vscode10.window.showQuickPick(items, {
+  const selected = await vscode11.window.showQuickPick(items, {
     placeHolder: "Select false positive vulnerabilities to undo",
     canPickMany: true
   });
   if (!selected || selected.length === 0) {
     return;
   }
-  const choice = await vscode10.window.showInformationMessage(
+  const choice = await vscode11.window.showInformationMessage(
     `Undo false positive marking for ${selected.length} vulnerability${selected.length > 1 ? "ies" : ""}?`,
     "Undo All Selected",
     "Cancel"
@@ -8456,7 +8657,7 @@ async function showFalsePositivesForUndo(provider) {
   if (choice !== "Undo All Selected") {
     return;
   }
-  const workspaceRoot = vscode10.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+  const workspaceRoot = vscode11.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
   let updatedCount = 0;
   for (const item of selected) {
     try {
@@ -8473,7 +8674,7 @@ async function showFalsePositivesForUndo(provider) {
 }
 
 // src/commands/filterByStatus.ts
-var vscode11 = __toESM(require("vscode"));
+var vscode12 = __toESM(require("vscode"));
 var currentStatusFilter = "all";
 function setStatusFilter(value) {
   currentStatusFilter = value;
@@ -8481,7 +8682,7 @@ function setStatusFilter(value) {
 async function filterByStatus(provider) {
   try {
     await showInfo("Filter By Status command triggered");
-    const status = await vscode11.window.showQuickPick(
+    const status = await vscode12.window.showQuickPick(
       ["all", "open", "fixed", "false_positive", "needs_attention"],
       { placeHolder: "Filter vulnerabilities by status" }
     );
@@ -8501,7 +8702,7 @@ function setLastDetectionContext(root) {
 }
 async function refreshVulnerabilities(provider, setVulnerabilities, resetAutoFixCount2, setTotalVulns2) {
   if (!lastWorkspaceRoot) {
-    showError("No Gemini detection has been run yet.");
+    showError("No OpenAI detection has been run yet.");
     return;
   }
   try {
@@ -8517,17 +8718,17 @@ async function refreshVulnerabilities(provider, setVulnerabilities, resetAutoFix
       }
     }
     provider.setVulnerabilities(vulns);
-    showInfo(`Refreshed ${vulns.length} vulnerabilities from the last Gemini snapshot.`);
+    showInfo(`Refreshed ${vulns.length} vulnerabilities from the last OpenAI snapshot.`);
     resetAutoFixCount2();
     setTotalVulns2(vulns.length);
     setStatusFilter("all");
   } catch (e2) {
-    showError("Failed to refresh Gemini snapshot: " + (e2.message || e2));
+    showError("Failed to refresh OpenAI snapshot: " + (e2.message || e2));
   }
 }
 
 // src/commands/costReport.ts
-var vscode12 = __toESM(require("vscode"));
+var vscode13 = __toESM(require("vscode"));
 var path6 = __toESM(require("path"));
 async function showCostReport() {
   const summary = costTracker.getCostSummary(30);
@@ -8572,7 +8773,7 @@ ${Object.entries(summary.costByModel).map(([model, cost]) => `\u2022 ${model}: $
 \u2022 Clear cost data to reset tracking
 \u2022 Adjust AI provider settings for cost optimization
 `;
-  const output = vscode12.window.createOutputChannel("Security Scan Cost Report");
+  const output = vscode13.window.createOutputChannel("Security Scan Cost Report");
   output.clear();
   output.appendLine(report);
   output.show(true);
@@ -8580,24 +8781,24 @@ ${Object.entries(summary.costByModel).map(([model, cost]) => `\u2022 ${model}: $
 }
 async function exportCostData() {
   const csvData = costTracker.exportToCSV();
-  const workspaceRoot = vscode12.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const workspaceRoot = vscode13.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!workspaceRoot) {
     showInfo("No workspace open. Cannot export cost data.");
     return;
   }
   const fileName = `firstsec-costs-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.csv`;
-  const filePath = vscode12.Uri.file(path6.join(workspaceRoot, fileName));
+  const filePath = vscode13.Uri.file(path6.join(workspaceRoot, fileName));
   try {
-    await vscode12.workspace.fs.writeFile(filePath, Buffer.from(csvData, "utf-8"));
+    await vscode13.workspace.fs.writeFile(filePath, Buffer.from(csvData, "utf-8"));
     showInfo(`Cost data exported to: ${fileName}`);
-    const document = await vscode12.workspace.openTextDocument(filePath);
-    await vscode12.window.showTextDocument(document);
+    const document = await vscode13.workspace.openTextDocument(filePath);
+    await vscode13.window.showTextDocument(document);
   } catch (error) {
     showInfo(`Failed to export cost data: ${error}`);
   }
 }
 async function clearCostData() {
-  const result = await vscode12.window.showWarningMessage(
+  const result = await vscode13.window.showWarningMessage(
     "Are you sure you want to clear all cost data? This action cannot be undone.",
     "Clear All Data",
     "Cancel"
@@ -8612,7 +8813,7 @@ async function clearCostData() {
 init_batchProcessor();
 
 // src/ui/FirstSecVulnerabilityProvider.ts
-var vscode13 = __toESM(require("vscode"));
+var vscode14 = __toESM(require("vscode"));
 
 // src/core/group.ts
 function groupBySeverity(vulns) {
@@ -8628,23 +8829,23 @@ function getSortedSeverityKeys(grouped) {
 }
 
 // src/ui/FirstSecVulnerabilityProvider.ts
-var BaseTreeItem = class extends vscode13.TreeItem {
+var BaseTreeItem = class extends vscode14.TreeItem {
 };
 var SeverityTreeItem = class extends BaseTreeItem {
   constructor(severity, count) {
-    super(`${severity} (${count})`, vscode13.TreeItemCollapsibleState.Collapsed);
+    super(`${severity} (${count})`, vscode14.TreeItemCollapsibleState.Collapsed);
     this.severity = severity;
   }
   severity;
 };
-var VulnerabilityTreeItem = class extends vscode13.TreeItem {
+var VulnerabilityTreeItem = class extends vscode14.TreeItem {
   constructor(vuln) {
-    super(`${vuln.category} [${vuln.filePath}:${vuln.line}]`, vscode13.TreeItemCollapsibleState.None);
+    super(`${vuln.category} [${vuln.filePath}:${vuln.line}]`, vscode14.TreeItemCollapsibleState.None);
     this.vuln = vuln;
     this.description = vuln.abstract;
     this.tooltip = `${vuln.category}
 ${vuln.filePath}:${vuln.line}`;
-    this.iconPath = new vscode13.ThemeIcon("bug");
+    this.iconPath = new vscode14.ThemeIcon("bug");
     this.command = {
       command: "firstsec.showVulnerabilityDetails",
       title: "Show Vulnerability Details",
@@ -8655,7 +8856,7 @@ ${vuln.filePath}:${vuln.line}`;
   vuln;
 };
 var FirstSecVulnerabilityProvider = class {
-  _onDidChangeTreeData = new vscode13.EventEmitter();
+  _onDidChangeTreeData = new vscode14.EventEmitter();
   onDidChangeTreeData = this._onDidChangeTreeData.event;
   vulnerabilities = [];
   getTreeItem(element) {
@@ -8691,18 +8892,78 @@ var FirstSecVulnerabilityProvider = class {
 // src/extension.ts
 function activate(context) {
   const provider = new FirstSecVulnerabilityProvider();
-  const treeView = vscode14.window.createTreeView("firstsecVulnerabilityExplorer", {
+  const treeView = vscode15.window.createTreeView("firstsecVulnerabilityExplorer", {
     treeDataProvider: provider,
     canSelectMany: true
   });
-  async function runGeminiScan() {
-    const workspaceRoot = vscode14.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+  async function runOpenAIScan() {
+    const workspaceRoot = vscode15.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
     if (!workspaceRoot) {
-      showError("Open a workspace folder before running Gemini detection.");
+      showError("Open a workspace folder before running OpenAI detection.");
       return;
     }
     setLastDetectionContext(workspaceRoot);
-    const vulns = await detectVulnerabilitiesWithGemini(workspaceRoot);
+    const vulns = await detectVulnerabilitiesWithOpenAI(workspaceRoot);
+    applyStoredStatuses(workspaceRoot, vulns);
+    provider.setVulnerabilities(vulns);
+    showInfo(`Detected ${vulns.length} vulnerabilities with OpenAI.`);
+    resetAutoFixCount();
+    setTotalVulns(vulns.length);
+    const batchOpportunity = detectBatchOpportunities(vulns);
+    if (batchOpportunity.totalBatches > 0) {
+      const choice = await vscode15.window.showInformationMessage(
+        `Found ${batchOpportunity.totalBatches} batch opportunities for ${batchOpportunity.totalVulnerabilities} vulnerabilities.`,
+        "Enable Batch Mode",
+        "Continue with Individual Mode"
+      );
+      if (choice === "Enable Batch Mode") {
+        showInfo('Batch mode enabled. Use "Fix All" or "Fix Selected" to process batches efficiently.');
+      }
+    }
+  }
+  async function runCurrentFileScan() {
+    const workspaceRoot = vscode15.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+    const editor = vscode15.window.activeTextEditor;
+    if (!workspaceRoot) {
+      showError("Open a workspace folder before running OpenAI detection.");
+      return;
+    }
+    if (!editor) {
+      showError("Open a file before running the current file scan.");
+      return;
+    }
+    setLastDetectionContext(workspaceRoot);
+    const vulns = await detectVulnerabilitiesInCurrentFile(workspaceRoot, editor.document);
+    applyStoredStatuses(workspaceRoot, vulns);
+    provider.setVulnerabilities(vulns);
+    showInfo(`Detected ${vulns.length} vulnerabilities in the current file.`);
+    resetAutoFixCount();
+    setTotalVulns(vulns.length);
+  }
+  async function runSelectionScan() {
+    const workspaceRoot = vscode15.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+    const editor = vscode15.window.activeTextEditor;
+    if (!workspaceRoot) {
+      showError("Open a workspace folder before running OpenAI detection.");
+      return;
+    }
+    if (!editor) {
+      showError("Open a file before running the selection scan.");
+      return;
+    }
+    if (editor.selection.isEmpty) {
+      showError("Select some code before running the selection scan.");
+      return;
+    }
+    setLastDetectionContext(workspaceRoot);
+    const vulns = await detectVulnerabilitiesInSelection(workspaceRoot, editor.document, editor.selection);
+    applyStoredStatuses(workspaceRoot, vulns);
+    provider.setVulnerabilities(vulns);
+    showInfo(`Detected ${vulns.length} vulnerabilities in the current selection.`);
+    resetAutoFixCount();
+    setTotalVulns(vulns.length);
+  }
+  function applyStoredStatuses(workspaceRoot, vulns) {
     const statusMap = loadStatuses(workspaceRoot);
     for (const v of vulns) {
       const key = getVulnerabilityStatusKey(v);
@@ -8713,41 +8974,40 @@ function activate(context) {
         v.status = statusMap[legacyKey];
       }
     }
-    provider.setVulnerabilities(vulns);
-    showInfo(`Detected ${vulns.length} vulnerabilities with Gemini.`);
-    resetAutoFixCount();
-    setTotalVulns(vulns.length);
-    const batchOpportunity = detectBatchOpportunities(vulns);
-    if (batchOpportunity.totalBatches > 0) {
-      const choice = await vscode14.window.showInformationMessage(
-        `Found ${batchOpportunity.totalBatches} batch opportunities for ${batchOpportunity.totalVulnerabilities} vulnerabilities.`,
-        "Enable Batch Mode",
-        "Continue with Individual Mode"
-      );
-      if (choice === "Enable Batch Mode") {
-        showInfo('Batch mode enabled. Use "Fix All" or "Fix Selected" to process batches efficiently.');
-      }
-    }
   }
   context.subscriptions.push(
-    vscode14.commands.registerCommand("firstsec.loadScanReport", async () => {
+    vscode15.commands.registerCommand("firstsec.loadScanReport", async () => {
       try {
-        await runGeminiScan();
+        await runOpenAIScan();
       } catch (e2) {
-        showError("Failed to detect vulnerabilities with Gemini: " + (e2.message || e2));
+        showError("Failed to detect vulnerabilities with OpenAI: " + (e2.message || e2));
       }
     }),
-    vscode14.commands.registerCommand("firstsec.rescanWithGemini", async () => {
+    vscode15.commands.registerCommand("firstsec.rescanWithOpenAI", async () => {
       try {
-        await runGeminiScan();
+        await runOpenAIScan();
       } catch (e2) {
-        showError("Failed to rescan vulnerabilities with Gemini: " + (e2.message || e2));
+        showError("Failed to rescan vulnerabilities with OpenAI: " + (e2.message || e2));
       }
     }),
-    vscode14.commands.registerCommand("firstsec.refreshVulnerabilities", async () => {
+    vscode15.commands.registerCommand("firstsec.scanCurrentFile", async () => {
+      try {
+        await runCurrentFileScan();
+      } catch (e2) {
+        showError("Failed to scan the current file with OpenAI: " + (e2.message || e2));
+      }
+    }),
+    vscode15.commands.registerCommand("firstsec.scanCurrentSelection", async () => {
+      try {
+        await runSelectionScan();
+      } catch (e2) {
+        showError("Failed to scan the current selection with OpenAI: " + (e2.message || e2));
+      }
+    }),
+    vscode15.commands.registerCommand("firstsec.refreshVulnerabilities", async () => {
       await refreshVulnerabilities(provider, provider.setVulnerabilities.bind(provider), resetAutoFixCount, setTotalVulns);
     }),
-    vscode14.commands.registerCommand("firstsec.showVulnerabilityDetails", async (item) => {
+    vscode15.commands.registerCommand("firstsec.showVulnerabilityDetails", async (item) => {
       const v = item.vuln;
       const buttons = ["Go to Code", "Auto Fix"];
       if (v.status === "false_positive") {
@@ -8755,7 +9015,7 @@ function activate(context) {
       } else {
         buttons.push("Mark as False Positive");
       }
-      const result = await vscode14.window.showInformationMessage(
+      const result = await vscode15.window.showInformationMessage(
         `Category: ${v.category}
 File: ${v.filePath}
 Line: ${v.line}
@@ -8774,14 +9034,14 @@ ${v.codeSnippet}`,
           await autoFixVulnerability(v);
         }
       } else if (result === "Go to Code") {
-        const fileUri = vscode14.Uri.file(path7.resolve(vscode14.workspace.workspaceFolders?.[0]?.uri.fsPath || "", v.filePath));
-        const document = await vscode14.workspace.openTextDocument(fileUri);
-        const editor = await vscode14.window.showTextDocument(document);
+        const fileUri = vscode15.Uri.file(path7.resolve(vscode15.workspace.workspaceFolders?.[0]?.uri.fsPath || "", v.filePath));
+        const document = await vscode15.workspace.openTextDocument(fileUri);
+        const editor = await vscode15.window.showTextDocument(document);
         const lineIndex = v.line - 1;
         if (lineIndex >= 0 && lineIndex < document.lineCount) {
           const range = document.lineAt(lineIndex).range;
-          editor.revealRange(range, vscode14.TextEditorRevealType.InCenter);
-          editor.selection = new vscode14.Selection(range.start, range.end);
+          editor.revealRange(range, vscode15.TextEditorRevealType.InCenter);
+          editor.selection = new vscode15.Selection(range.start, range.end);
         }
       } else if (result === "Mark as False Positive") {
         await markFalsePositive({ selection: [item] }, provider);
@@ -8789,37 +9049,37 @@ ${v.codeSnippet}`,
         await undoFalsePositiveSingle(v, provider);
       }
     }),
-    vscode14.commands.registerCommand("firstsec.fixAll", async () => {
+    vscode15.commands.registerCommand("firstsec.fixAll", async () => {
       await autoFixAll(provider, autoFixVulnerability);
     }),
-    vscode14.commands.registerCommand("firstsec.fixSelected", async () => {
+    vscode15.commands.registerCommand("firstsec.fixSelected", async () => {
       await autoFixSelected(treeView, autoFixVulnerability);
     }),
-    vscode14.commands.registerCommand("firstsec.markFalsePositive", async () => {
+    vscode15.commands.registerCommand("firstsec.markFalsePositive", async () => {
       await markFalsePositive(treeView, provider);
     }),
-    vscode14.commands.registerCommand("firstsec.undoFalsePositive", async () => {
+    vscode15.commands.registerCommand("firstsec.undoFalsePositive", async () => {
       await undoFalsePositive(treeView, provider);
     }),
-    vscode14.commands.registerCommand("firstsec.showFalsePositivesForUndo", async () => {
+    vscode15.commands.registerCommand("firstsec.showFalsePositivesForUndo", async () => {
       await showFalsePositivesForUndo(provider);
     }),
-    vscode14.commands.registerCommand("firstsec.filterByStatus", async () => {
+    vscode15.commands.registerCommand("firstsec.filterByStatus", async () => {
       await filterByStatus(provider);
     }),
-    vscode14.commands.registerCommand("firstsec.buildProject", async () => {
-      const terminal = vscode14.window.createTerminal({ name: "Security Scan Build" });
+    vscode15.commands.registerCommand("firstsec.buildProject", async () => {
+      const terminal = vscode15.window.createTerminal({ name: "Security Scan Build" });
       terminal.show();
       terminal.sendText("mvn clean install");
-      vscode14.window.showInformationMessage("Build started: mvn clean install");
+      vscode15.window.showInformationMessage("Build started: mvn clean install");
     }),
-    vscode14.commands.registerCommand("firstsec.showCostReport", async () => {
+    vscode15.commands.registerCommand("firstsec.showCostReport", async () => {
       await showCostReport();
     }),
-    vscode14.commands.registerCommand("firstsec.exportCostData", async () => {
+    vscode15.commands.registerCommand("firstsec.exportCostData", async () => {
       await exportCostData();
     }),
-    vscode14.commands.registerCommand("firstsec.clearCostData", async () => {
+    vscode15.commands.registerCommand("firstsec.clearCostData", async () => {
       await clearCostData();
     })
   );

@@ -22,7 +22,7 @@ You are a software security expert. A vulnerability has been detected in the fol
 \${code}
 ------------------
 
-Respond in the following format (only return actual Java code in blocks, no extra commentary):
+Respond in the following format (only return actual Java code in blocks, no extra commentary): #why only java????
 
 # Explanation:
 ...

@@ -23,11 +23,11 @@ You are a software security expert. Multiple ${vulnType} vulnerabilities have be
 📍 Locations: ${severityInfo}
 
 🔍 Here's what I expect from you:
-1. Analyze ALL vulnerabilities together to understand the root cause.
-2. Provide a comprehensive fix that addresses ALL instances consistently.
+1. Analyze ALL vulnerabilities together to understand the root cause.        #change all together is too much, but we can say analyze all vulnerabilities in the file together to understand the root cause. maybe.
+2. Provide a comprehensive fix that addresses ALL instances consistently.   
 3. The project uses layered architecture: Controller → Service → Repository.
 4. Apply corrections in all necessary layers, not just superficially.
-5. Do NOT delete or replace unrelated code. Only change the lines that are necessary.
+5. Do NOT delete or replace unrelated code. Only change the lines that are necessary. #doesnt listen this
 6. Do NOT replace the entire file unless absolutely necessary.
 
 🔐 Vulnerable Code Snippets:

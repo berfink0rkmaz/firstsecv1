@@ -23,12 +23,12 @@ ${trimmedSnippet}
 
 ### Instructions:
 - **Analyze** the code and identify the minimal, correct, and secure fix for the vulnerability.
-- **Do NOT** delete, replace, or rewrite unrelated code. Only change the lines that are necessary to fix the vulnerability.
+- **Do NOT** delete, replace, or rewrite unrelated code. Only change the lines that are necessary to fix the vulnerability. #doesnt listen this
 - **Do NOT** replace the entire file unless absolutely necessary. If you must, add a comment at the top: // FULL FILE REPLACEMENT: [reason]
 - If the fix requires changes in other layers (Controller, Service, Repository, etc.), include only the minimal necessary changes for those files as well.
-- **If you are unsure about a file, do not change it.**
+- **If you are unsure about a file, do not change it.**     #doesnt listen this
 - **Never remove or empty out a file.**
-- **Do not add explanations, comments, or extra output. Only return code blocks.**
+- **Do not add explanations, comments, or extra output. Only return code blocks.**   #this would be nice. it can explain shortly as a comment
 
 ### Output format:
 If only one file is affected:

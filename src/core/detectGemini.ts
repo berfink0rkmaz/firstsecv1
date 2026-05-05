@@ -33,7 +33,7 @@ const MAX_FILE_SIZE = 20_000;
 const MAX_NEIGHBORS = 3;
 const DETECTION_SNAPSHOT_FILE = '.openai-detection.json';
 
-export async function detectVulnerabilitiesWithGemini(workspaceRoot: string): Promise<Vulnerability[]> {
+export async function detectVulnerabilitiesWithOpenAI(workspaceRoot: string): Promise<Vulnerability[]> {
     const apiKey = getApiKey();
     const model = getModel();
 
