@@ -89,19 +89,12 @@ function getFileExtension(filePath: string): string {
     const ext = filePath.split('.').pop()?.toLowerCase();
     const extensionMap: { [key: string]: string } = {
         java: 'java',
-        js: 'javascript',
-        ts: 'typescript',
         py: 'python',
-        cs: 'csharp',
         cpp: 'cpp',
         c: 'c',
-        go: 'go',
-        rb: 'ruby',
-        php: 'php',
-        kt: 'kotlin',
-        scala: 'scala',
-        swift: 'swift',
-        rs: 'rust'
+        cc: 'cpp',
+        h: 'c',
+        hpp: 'cpp'
     };
 
     return extensionMap[ext || ''] || 'text';

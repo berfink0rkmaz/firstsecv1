@@ -1,6 +1,6 @@
 export function generatePrompt(issue: any): string {
   return `
-You are a software security expert. A vulnerability has been detected in the following Java code:
+You are a software security expert. A vulnerability has been detected in the following code. The supported languages are C, C++, Java, and Python.
 
 📂 File: ${issue.Filepath}
 📍 Line: ${issue.Loc}
@@ -22,23 +22,23 @@ You are a software security expert. A vulnerability has been detected in the fol
 \${code}
 ------------------
 
-Respond in the following format (only return actual Java code in blocks, no extra commentary): #why only java????
+Respond in the following format (only return actual code in blocks, no extra commentary):
 
 # Explanation:
 ...
 
 # controller/SomeController.java
-\`\`\`java
+\`\`\`
 // fixed controller layer
 \`\`\`
 
 # service/SomeService.java
-\`\`\`java
+\`\`\`
 // fixed service layer
 \`\`\`
 
 # repository/SomeRepository.java
-\`\`\`java
+\`\`\`
 // fixed repository layer
 \`\`\`
 `;

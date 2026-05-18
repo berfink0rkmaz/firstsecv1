@@ -26,7 +26,7 @@ type ScanFile = {
     content: string;
 };
 
-const DEFAULT_INCLUDE = '**/*.{js,jsx,ts,tsx,java,py,cs,go,php,rb,kt,kts,scala,swift,c,cc,cpp,h,hpp}';
+const DEFAULT_INCLUDE = '**/*.{java,py,c,cc,cpp,h,hpp}';
 const DEFAULT_EXCLUDE = '**/{node_modules,dist,out,build,target,.git,coverage,.next,.nuxt,vendor}/**';
 const MAX_FILES = 25;
 const MAX_FILE_SIZE = 20_000;
@@ -229,15 +229,6 @@ function extractLocalImports(file: ScanFile): string[] {
     const imports = new Set<string>();
     const extension = path.extname(file.filePath).toLowerCase();
 
-    if (['.js', '.jsx', '.ts', '.tsx'].includes(extension)) {
-        const regex = /(?:import\s+(?:[\s\S]*?\s+from\s+)?|require\()\s*['"](\.{1,2}\/[^'"]+)['"]/g;
-        for (const match of file.content.matchAll(regex)) {
-            if (match[1]) {
-                imports.add(match[1]);
-            }
-        }
-    }
-
     if (extension === '.java') {
         const regex = /import\s+([\w.]+)\s*;/g;
         for (const match of file.content.matchAll(regex)) {
@@ -256,22 +247,13 @@ function resolveImport(sourcePath: string, importPath: string, allFiles: ScanFil
     const base = normalizePath(path.posix.normalize(path.posix.join(sourceDir, importPath)));
     const candidates = [
         base,
-        `${base}.ts`,
-        `${base}.tsx`,
-        `${base}.js`,
-        `${base}.jsx`,
         `${base}.java`,
         `${base}.py`,
-        `${base}.cs`,
-        `${base}.go`,
-        `${base}.php`,
-        `${base}.rb`,
-        `${base}.kt`,
-        `${base}.scala`,
-        `${base}/index.ts`,
-        `${base}/index.tsx`,
-        `${base}/index.js`,
-        `${base}/index.jsx`
+        `${base}.c`,
+        `${base}.cc`,
+        `${base}.cpp`,
+        `${base}.h`,
+        `${base}.hpp`
     ];
 
     for (const candidate of candidates) {

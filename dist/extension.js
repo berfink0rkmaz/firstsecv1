@@ -7247,7 +7247,7 @@ function isProtectedFile(filePath) {
 }
 
 // src/core/detectGemini.ts
-var DEFAULT_INCLUDE = "**/*.{js,jsx,ts,tsx,java,py,cs,go,php,rb,kt,kts,scala,swift,c,cc,cpp,h,hpp}";
+var DEFAULT_INCLUDE = "**/*.{java,py,c,cc,cpp,h,hpp}";
 var DEFAULT_EXCLUDE = "**/{node_modules,dist,out,build,target,.git,coverage,.next,.nuxt,vendor}/**";
 var MAX_FILES = 25;
 var MAX_FILE_SIZE = 2e4;
@@ -7407,14 +7407,6 @@ function pickNeighborFiles(target, allFiles) {
 function extractLocalImports(file) {
   const imports = /* @__PURE__ */ new Set();
   const extension = path2.extname(file.filePath).toLowerCase();
-  if ([".js", ".jsx", ".ts", ".tsx"].includes(extension)) {
-    const regex = /(?:import\s+(?:[\s\S]*?\s+from\s+)?|require\()\s*['"](\.{1,2}\/[^'"]+)['"]/g;
-    for (const match of file.content.matchAll(regex)) {
-      if (match[1]) {
-        imports.add(match[1]);
-      }
-    }
-  }
   if (extension === ".java") {
     const regex = /import\s+([\w.]+)\s*;/g;
     for (const match of file.content.matchAll(regex)) {
@@ -7431,22 +7423,13 @@ function resolveImport(sourcePath, importPath, allFiles) {
   const base = normalizePath(path2.posix.normalize(path2.posix.join(sourceDir, importPath)));
   const candidates = [
     base,
-    `${base}.ts`,
-    `${base}.tsx`,
-    `${base}.js`,
-    `${base}.jsx`,
     `${base}.java`,
     `${base}.py`,
-    `${base}.cs`,
-    `${base}.go`,
-    `${base}.php`,
-    `${base}.rb`,
-    `${base}.kt`,
-    `${base}.scala`,
-    `${base}/index.ts`,
-    `${base}/index.tsx`,
-    `${base}/index.js`,
-    `${base}/index.jsx`
+    `${base}.c`,
+    `${base}.cc`,
+    `${base}.cpp`,
+    `${base}.h`,
+    `${base}.hpp`
   ];
   for (const candidate of candidates) {
     const match = allFiles.find((file) => file.filePath === candidate);
@@ -7929,19 +7912,12 @@ function getFileExtension(filePath) {
   const ext = filePath.split(".").pop()?.toLowerCase();
   const extensionMap = {
     java: "java",
-    js: "javascript",
-    ts: "typescript",
     py: "python",
-    cs: "csharp",
     cpp: "cpp",
     c: "c",
-    go: "go",
-    rb: "ruby",
-    php: "php",
-    kt: "kotlin",
-    scala: "scala",
-    swift: "swift",
-    rs: "rust"
+    cc: "cpp",
+    h: "c",
+    hpp: "cpp"
   };
   return extensionMap[ext || ""] || "text";
 }
@@ -8145,7 +8121,7 @@ async function autoFixVulnerability(vuln, provider, dryRun) {
     secureByDesign: "Suggest architectural or systemic refactors to eliminate entire vulnerability classes (e.g., sanitize all inputs via middleware).",
     owaspContextualizer: "Map each security issue to its corresponding OWASP Top 10 category and explain the broader implications. Add comments referencing OWASP where appropriate.",
     performanceAwareFixer: "Fix vulnerabilities while considering performance impact\u2014avoid expensive operations, memory leaks, and ensure efficient code.",
-    languageExpert: "Fix security issues using idiomatic patterns in the project\u2019s specific language (e.g., Java, C#, Python). Use best practices for the language.",
+    languageExpert: "Fix security issues using idiomatic patterns in the project\u2019s specific language (e.g., C, C++, Java, Python). Use best practices for the language.",
     legacyFriendlyFixer: "Suggest fixes that are safe for older codebases\u2014avoid modern features that might break compatibility.",
     policyAlignedFixer: "Fix issues in line with internal coding standards or specific security suppression policies. Reference policy where relevant.",
     reviewerAssistant: "Write commit messages, JIRA comments, and fix rationales for each security issue resolution. Add comments to the code as needed.",
@@ -8184,7 +8160,7 @@ ${getPromptForIssue(vuln)}`;
     else showError("AI API error: " + errorMsg, err);
     return null;
   }
-  const codeBlockRegex = /#.*?([\w\-/\\.]+\.(?:java|js|ts|py|cs|cpp|c|go|rb|php|kt|scala|swift|rs|m|h|json|xml|yml|yaml|properties|config|env)).*?\n```[\w+]*\n([\s\S]*?)```/gi;
+  const codeBlockRegex = /#.*?([\w\-/\\.]+\.(?:java|py|c|cc|cpp|h|hpp)).*?\n```[\w+]*\n([\s\S]*?)```/gi;
   let allBlocks = [];
   let match;
   while ((match = codeBlockRegex.exec(aiResponse)) !== null) {
