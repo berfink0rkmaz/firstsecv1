@@ -7485,7 +7485,8 @@ function mapFindings(findings, file) {
   for (const finding of findings) {
     const category = asString(finding.category);
     const abstract = asString(finding.abstract);
-    const line = toLineNumber(finding.line, lines.length);
+    const snippet = asString(finding.codeSnippet);
+    const line = resolveFindingLine(lines, snippet, finding.line);
     if (!category || !abstract || !line) {
       continue;
     }
@@ -7509,18 +7510,18 @@ function mapSelectionFindings(findings, file, startLine, endLine) {
   for (const finding of findings) {
     const category = asString(finding.category);
     const abstract = asString(finding.abstract);
-    const relativeLine = toLineNumber(finding.line, endLine - startLine + 1);
-    if (!category || !abstract || !relativeLine) {
+    const snippet = asString(finding.codeSnippet);
+    const absoluteLine = resolveSelectionFindingLine(lines, snippet, finding.line, startLine, endLine);
+    if (!category || !abstract || !absoluteLine) {
       continue;
     }
-    const absoluteLine = Math.min(startLine + relativeLine, lines.length);
     vulnerabilities.push({
       category,
       filePath: file.filePath,
       line: absoluteLine,
       severity: normalizeSeverity(finding.severity),
       language: file.language,
-      codeSnippet: asString(finding.codeSnippet) ?? lines[absoluteLine - 1] ?? "",
+      codeSnippet: snippet ?? lines[absoluteLine - 1] ?? "",
       abstract,
       fullFileContent: file.content,
       status: "open"
@@ -7541,6 +7542,51 @@ function normalizeSeverity(value) {
     default:
       return "Medium";
   }
+}
+function resolveFindingLine(lines, snippet, aiLine) {
+  if (snippet) {
+    const snippetLine = findSnippetLine(lines, snippet);
+    if (snippetLine) {
+      return snippetLine;
+    }
+  }
+  return toLineNumber(aiLine, lines.length);
+}
+function resolveSelectionFindingLine(lines, snippet, aiLine, startLine, endLine) {
+  if (snippet) {
+    const snippetLine = findSnippetLine(lines, snippet, startLine, endLine);
+    if (snippetLine) {
+      return snippetLine;
+    }
+  }
+  const relativeLine = toLineNumber(aiLine, endLine - startLine + 1);
+  return relativeLine ? Math.min(startLine + relativeLine, lines.length) : null;
+}
+function findSnippetLine(lines, snippet, startIndex = 0, endIndex = lines.length - 1) {
+  const needle = snippet.trim();
+  if (!needle) {
+    return null;
+  }
+  const normalizedNeedle = normalizeForLineMatch(needle);
+  for (let i2 = startIndex; i2 <= endIndex && i2 < lines.length; i2++) {
+    if (lines[i2].includes(needle) || normalizeForLineMatch(lines[i2]).includes(normalizedNeedle)) {
+      return i2 + 1;
+    }
+  }
+  const snippetLines = needle.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  for (const snippetLine of snippetLines) {
+    const normalizedSnippetLine = normalizeForLineMatch(snippetLine);
+    for (let i2 = startIndex; i2 <= endIndex && i2 < lines.length; i2++) {
+      const normalizedLine = normalizeForLineMatch(lines[i2]);
+      if (lines[i2].includes(snippetLine) || normalizedLine.includes(normalizedSnippetLine)) {
+        return i2 + 1;
+      }
+    }
+  }
+  return null;
+}
+function normalizeForLineMatch(value) {
+  return value.replace(/\\"/g, '"').replace(/\\'/g, "'").replace(/\s+/g, " ").trim();
 }
 function toLineNumber(value, maxLine) {
   const line = typeof value === "number" ? value : Number(value);
@@ -7801,62 +7847,101 @@ init_batchProcessor();
 // src/prompts/batchPrompt.ts
 function generateBatchPrompt(batchGroup) {
   const { filePath, vulnType, vulnerabilities } = batchGroup;
-  const codeSnippets = vulnerabilities.map((v) => `Line ${v.line}: ${v.codeSnippet}`).join("\n");
-  const severityInfo = vulnerabilities.map((v) => `Line ${v.line}: ${v.severity} severity`).join(", ");
+  const findings = vulnerabilities.map((v) => `Line ${v.line}: ${v.codeSnippet}`).join("\n\n");
   return `
-You are a software security expert. Multiple ${vulnType} vulnerabilities have been detected in the same file:
+Fix the selected security vulnerabilities in this file.
 
-\u{1F4C2} File: ${filePath}
-\u{1F9E8} Type: ${vulnType}
-\u{1F4CA} Count: ${vulnerabilities.length} vulnerabilities
-\u{1F4CD} Locations: ${severityInfo}
+Before writing any code, determine internally:
+1. the shared vulnerability type or pattern,
+2. the vulnerable sinks or unsafe APIs,
+3. the untrusted inputs or sources that reach them, if any,
+4. the secure remediation pattern that should be applied consistently,
+5. the smallest set of code changes needed to fix all listed findings without changing business logic.
 
-\u{1F50D} Here's what I expect from you:
-1. Analyze ALL vulnerabilities together to understand the root cause.
-2. Provide a comprehensive fix that addresses ALL instances consistently.
-3. The project uses layered architecture: Controller \u2192 Service \u2192 Repository.
-4. Apply corrections in all necessary layers, not just superficially.
-5. Do NOT delete or replace unrelated code. Only change the lines that are necessary.
-6. Do NOT replace the entire file unless absolutely necessary.
+Then apply the fix using one consistent secure coding approach across all listed findings.
 
-\u{1F510} Vulnerable Code Snippets:
-------------------
-${codeSnippets}
-------------------
+TARGET FILE
+File: ${filePath}
+Vulnerability Type: ${vulnType}
+Count: ${vulnerabilities.length}
 
-Respond in the following format (only return actual code in blocks, no extra commentary):
+VULNERABLE CODE
+${findings}
 
-# Explanation:
-Brief explanation of the comprehensive fix approach.
+Important rules:
+- Fix only the listed vulnerabilities.
+- Fix the actual vulnerable sinks, not unrelated code.
+- Change only the code that is necessary for the fix.
+- Do not modify a different function by mistake.
+- Do not delete any function.
+- Do not delete business logic.
+- Do not replace real logic with an empty body, placeholder, null, or a trivial return.
+- Do not rewrite the whole file unless absolutely necessary.
+- Do not add dead code or commented-out code.
+- Do not add unused variables, unused methods, or unused imports.
+- Do not suppress or hide the findings with comments.
+- Do not replace one unsafe pattern with another unsafe pattern.
+- Use the standard safe library, validation, encoding, parameterization, or authorization pattern normally used for this vulnerability type.
+- Preserve the original business behavior.
+- Return compilable code only.
+- Prefer fixing the smallest relevant methods or statements instead of rewriting the full file.
+- Apply one consistent fix pattern to the listed vulnerabilities.
+- Prefer a same-file fix if it is secure and sufficient.
+- If another file is absolutely necessary, include it. Otherwise do not touch any other file.
+
+Bad fixes include:
+- deleting a vulnerable method
+- replacing a method body with return, return null, return [], or a constant
+- removing unrelated business logic
+- rewriting the full class when only a few methods need a fix
+
+OUTPUT RULES
+- Return code only.
+- Do not include explanations.
+- Do not include notes.
+- Do not include markdown text except file headers.
+- The first file must be exactly this file: ${filePath}
+
+OUTPUT FORMAT
 
 # ${filePath}
 \`\`\`${getFileExtension(filePath)}
-// Comprehensive fix for all ${vulnType} vulnerabilities
+[fixed code]
 \`\`\`
 
-# Additional files (if needed)
-\`\`\`filename.ext
-// Additional fixes for other layers
+If another file is absolutely required, add:
+
+# relative/path/to/OtherFile.ext
 \`\`\`
+[fixed code]
+\`\`\`
+
+FINAL CHECK BEFORE ANSWERING
+- Did you fix the actual vulnerable sinks?
+- Did you fix only the listed vulnerabilities?
+- Did you keep the original logic?
+- Did you avoid deleting code?
+- Did you avoid replacing code with a trivial return?
+- Did you avoid rewriting the whole file?
 `;
 }
 function getFileExtension(filePath) {
   const ext = filePath.split(".").pop()?.toLowerCase();
   const extensionMap = {
-    "java": "java",
-    "js": "javascript",
-    "ts": "typescript",
-    "py": "python",
-    "cs": "csharp",
-    "cpp": "cpp",
-    "c": "c",
-    "go": "go",
-    "rb": "ruby",
-    "php": "php",
-    "kt": "kotlin",
-    "scala": "scala",
-    "swift": "swift",
-    "rs": "rust"
+    java: "java",
+    js: "javascript",
+    ts: "typescript",
+    py: "python",
+    cs: "csharp",
+    cpp: "cpp",
+    c: "c",
+    go: "go",
+    rb: "ruby",
+    php: "php",
+    kt: "kotlin",
+    scala: "scala",
+    swift: "swift",
+    rs: "rust"
   };
   return extensionMap[ext || ""] || "text";
 }
@@ -7864,50 +7949,87 @@ function getFileExtension(filePath) {
 // src/core/autoFixVulnerability.ts
 var vscode6 = __toESM(require("vscode"));
 
-// src/prompts/severityLevelPrompt.ts
-function generatePrompt(issue) {
+// src/prompts/chosenIssuePrompt.ts
+function getPromptForIssue(issue) {
+  const trimmedSnippet = issue.codeSnippet.trim();
   return `
-You are a software security expert. A vulnerability has been detected in the following Java code:
+Fix the selected security vulnerability.
 
-\u{1F4C2} File: ${issue.Filepath}
-\u{1F4CD} Line: ${issue.Loc}
-\u{1F9E8} Type: ${issue.Finding}
-\u{1F4DD} Summary: ${issue.Summary}
+Before writing any code, determine internally:
+1. the vulnerability type,
+2. the exact vulnerable sink or unsafe API,
+3. the untrusted input or source that reaches it, if any,
+4. the secure remediation pattern normally used for this vulnerability type,
+5. the smallest code change that fixes it without changing business logic.
 
-\u{1F50D} Here's what I expect from you:
-1. Explain clearly what the security problem is.
-2. The project uses a **layered architecture**: Controller \u2192 Service \u2192 Repository. Based on the issue type, analyze **which layers are affected**, and adjust your fix accordingly.
-3. Apply corrections in **all necessary layers**, not just superficially:
-   - For example, if it's a SQL injection: sanitize in Service and fix the query in Repository.
-   - If it's input validation: validate in Controller, but move business logic to Service if needed.
-   - Do NOT delete or replace unrelated code. Only change the lines that are necessary to fix the vulnerability. Never delete large portions of a file. If you are unsure, do not change the file.
-   - Do NOT replace the entire file unless it is absolutely necessary for the fix. If you must, explain why in a comment at the top of the code block.
-4. Return **full, clean code blocks for each affected file**, ready to be copied into the project.
+Then apply the fix using the standard secure coding approach for that vulnerability type.
 
-\u{1F510} Vulnerable Code Snippet:
-------------------
-\${code}
-------------------
+VULNERABILITY DETAILS
+File: ${issue.filePath}
+Line: ${issue.line}
+Language: ${issue.language}
+Severity: ${issue.severity}
+Category: ${issue.category}
+Description: ${issue.abstract}
 
-Respond in the following format (only return actual Java code in blocks, no extra commentary):
-
-# Explanation:
-...
-
-# controller/SomeController.java
-\`\`\`java
-// fixed controller layer
+VULNERABLE CODE
+\`\`\`${issue.language}
+${trimmedSnippet}
 \`\`\`
 
-# service/SomeService.java
-\`\`\`java
-// fixed service layer
+Important rules:
+- Fix the actual vulnerable sink, not unrelated code.
+- Change only the code that is necessary for the fix.
+- Do not modify a different function, class, or layer unless it is required for the fix.
+- Do not delete any function.
+- Do not delete business logic.
+- Do not replace real logic with an empty body, placeholder, null, or a trivial return.
+- Do not rewrite the whole file unless absolutely necessary.
+- Do not add dead code or commented-out code.
+- Do not add unused variables, unused methods, or unused imports.
+- Do not suppress, hide, or silence the finding with comments or annotations.
+- Do not replace one unsafe pattern with another unsafe pattern.
+- Use the standard safe library, validation, encoding, parameterization, or authorization pattern normally used for this vulnerability type.
+- Preserve the original business behavior.
+- Return compilable code only.
+- If you are not sure, make the smallest safe fix.
+- Prefer a same-file fix if it is secure and sufficient.
+- If a second file is absolutely necessary, include it. Otherwise do not touch any other file.
+
+Bad fixes include:
+- deleting the vulnerable method
+- replacing the method body with return, return null, return [], or a constant
+- removing validation or business logic unrelated to the issue
+- rewriting the full class when only one method needs a fix
+
+Output rules:
+- Return code only.
+- Do not include explanations.
+- Do not include notes.
+- Do not include markdown text except file headers.
+- The first file must be exactly this file: ${issue.filePath}
+
+OUTPUT FORMAT
+
+# ${issue.filePath}
+\`\`\`${issue.language}
+[fixed code]
 \`\`\`
 
-# repository/SomeRepository.java
-\`\`\`java
-// fixed repository layer
+If another file is absolutely required, add:
+
+# relative/path/to/OtherFile.ext
 \`\`\`
+[fixed code]
+\`\`\`
+
+FINAL CHECK BEFORE ANSWERING
+- Did you fix the actual vulnerable sink?
+- Did you fix the correct function?
+- Did you keep the original logic?
+- Did you avoid deleting code?
+- Did you avoid replacing code with a trivial return?
+- Did you avoid rewriting the whole file?
 `;
 }
 
@@ -8032,13 +8154,7 @@ async function autoFixVulnerability(vuln, provider, dryRun) {
   const personaText = personaInstructions[persona] || "";
   const prompt = `${personaText}
 
-${generatePrompt({
-    Filepath: vuln.filePath,
-    Loc: vuln.line,
-    Finding: vuln.category,
-    Summary: vuln.abstract,
-    code: vuln.codeSnippet
-  })}`;
+${getPromptForIssue(vuln)}`;
   let aiResponse = "";
   const providerStr = config2.get("aiProvider", "gemini");
   try {

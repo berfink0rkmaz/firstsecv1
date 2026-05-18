@@ -4,9 +4,16 @@ export function getPromptForIssue(issue: Vulnerability): string {
   const trimmedSnippet = issue.codeSnippet.trim();
 
   return `
-You are fixing ONE security vulnerability.
+Fix the selected security vulnerability.
 
-Your job is to fix the vulnerability without damaging the file.
+Before writing any code, determine internally:
+1. the vulnerability type,
+2. the exact vulnerable sink or unsafe API,
+3. the untrusted input or source that reaches it, if any,
+4. the secure remediation pattern normally used for this vulnerability type,
+5. the smallest code change that fixes it without changing business logic.
+
+Then apply the fix using the standard secure coding approach for that vulnerability type.
 
 VULNERABILITY DETAILS
 File: ${issue.filePath}
@@ -21,25 +28,36 @@ VULNERABLE CODE
 ${trimmedSnippet}
 \`\`\`
 
-VERY IMPORTANT RULES
-- Change ONLY the vulnerable code.
-- Do NOT change a different function.
-- Do NOT delete any function.
-- Do NOT delete function logic.
-- Do NOT replace real logic with an empty body, null, placeholder, or a simple return.
-- Do NOT shorten the file by removing code.
-- Do NOT rewrite the whole file.
-- Do NOT remove imports, methods, classes, or validations unless the vulnerability fix truly requires it.
-- Keep all existing business logic.
-- Keep all unrelated code exactly as it is.
+Important rules:
+- Fix the actual vulnerable sink, not unrelated code.
+- Change only the code that is necessary for the fix.
+- Do not modify a different function, class, or layer unless it is required for the fix.
+- Do not delete any function.
+- Do not delete business logic.
+- Do not replace real logic with an empty body, placeholder, null, or a trivial return.
+- Do not rewrite the whole file unless absolutely necessary.
+- Do not add dead code or commented-out code.
+- Do not add unused variables, unused methods, or unused imports.
+- Do not suppress, hide, or silence the finding with comments or annotations.
+- Do not replace one unsafe pattern with another unsafe pattern.
+- Use the standard safe library, validation, encoding, parameterization, or authorization pattern normally used for this vulnerability type.
+- Preserve the original business behavior.
+- Return compilable code only.
 - If you are not sure, make the smallest safe fix.
+- Prefer a same-file fix if it is secure and sufficient.
 - If a second file is absolutely necessary, include it. Otherwise do not touch any other file.
 
-OUTPUT RULES
-- Return ONLY code blocks.
-- Do NOT write explanations.
-- Do NOT write notes.
-- Do NOT write markdown text except file headers.
+Bad fixes include:
+- deleting the vulnerable method
+- replacing the method body with return, return null, return [], or a constant
+- removing validation or business logic unrelated to the issue
+- rewriting the full class when only one method needs a fix
+
+Output rules:
+- Return code only.
+- Do not include explanations.
+- Do not include notes.
+- Do not include markdown text except file headers.
 - The first file must be exactly this file: ${issue.filePath}
 
 OUTPUT FORMAT
@@ -57,6 +75,7 @@ If another file is absolutely required, add:
 \`\`\`
 
 FINAL CHECK BEFORE ANSWERING
+- Did you fix the actual vulnerable sink?
 - Did you fix the correct function?
 - Did you keep the original logic?
 - Did you avoid deleting code?
