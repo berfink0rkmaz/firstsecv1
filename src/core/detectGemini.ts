@@ -322,7 +322,8 @@ function mapFindings(findings: GeminiFinding[], file: ScanFile): Vulnerability[]
     for (const finding of findings) {
         const category = asString(finding.category);
         const abstract = asString(finding.abstract);
-        const line = toLineNumber(finding.line, lines.length);
+        const snippet = asString(finding.codeSnippet);
+        const line = resolveFindingLine(lines, snippet, finding.line);
 
         if (!category || !abstract || !line) {
             continue;
@@ -356,20 +357,20 @@ function mapSelectionFindings(
     for (const finding of findings) {
         const category = asString(finding.category);
         const abstract = asString(finding.abstract);
-        const relativeLine = toLineNumber(finding.line, endLine - startLine + 1);
+        const snippet = asString(finding.codeSnippet);
+        const absoluteLine = resolveSelectionFindingLine(lines, snippet, finding.line, startLine, endLine);
 
-        if (!category || !abstract || !relativeLine) {
+        if (!category || !abstract || !absoluteLine) {
             continue;
         }
 
-        const absoluteLine = Math.min(startLine + relativeLine, lines.length);
         vulnerabilities.push({
             category,
             filePath: file.filePath,
             line: absoluteLine,
             severity: normalizeSeverity(finding.severity),
             language: file.language,
-            codeSnippet: asString(finding.codeSnippet) ?? lines[absoluteLine - 1] ?? '',
+            codeSnippet: snippet ?? lines[absoluteLine - 1] ?? '',
             abstract,
             fullFileContent: file.content,
             status: 'open'
@@ -392,6 +393,76 @@ function normalizeSeverity(value: unknown): Vulnerability['severity'] {
         default:
             return 'Medium';
     }
+}
+
+function resolveFindingLine(lines: string[], snippet: string | null, aiLine: unknown): number | null {
+    if (snippet) {
+        const snippetLine = findSnippetLine(lines, snippet);
+        if (snippetLine) {
+            return snippetLine;
+        }
+    }
+
+    return toLineNumber(aiLine, lines.length);
+}
+
+function resolveSelectionFindingLine(
+    lines: string[],
+    snippet: string | null,
+    aiLine: unknown,
+    startLine: number,
+    endLine: number
+): number | null {
+    if (snippet) {
+        const snippetLine = findSnippetLine(lines, snippet, startLine, endLine);
+        if (snippetLine) {
+            return snippetLine;
+        }
+    }
+
+    const relativeLine = toLineNumber(aiLine, endLine - startLine + 1);
+    return relativeLine ? Math.min(startLine + relativeLine, lines.length) : null;
+}
+
+function findSnippetLine(lines: string[], snippet: string, startIndex = 0, endIndex = lines.length - 1): number | null {
+    const needle = snippet.trim();
+
+    if (!needle) {
+        return null;
+    }
+
+    const normalizedNeedle = normalizeForLineMatch(needle);
+
+    for (let i = startIndex; i <= endIndex && i < lines.length; i++) {
+        if (lines[i].includes(needle) || normalizeForLineMatch(lines[i]).includes(normalizedNeedle)) {
+            return i + 1;
+        }
+    }
+
+    const snippetLines = needle
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean);
+
+    for (const snippetLine of snippetLines) {
+        const normalizedSnippetLine = normalizeForLineMatch(snippetLine);
+        for (let i = startIndex; i <= endIndex && i < lines.length; i++) {
+            const normalizedLine = normalizeForLineMatch(lines[i]);
+            if (lines[i].includes(snippetLine) || normalizedLine.includes(normalizedSnippetLine)) {
+                return i + 1;
+            }
+        }
+    }
+
+    return null;
+}
+
+function normalizeForLineMatch(value: string): string {
+    return value
+        .replace(/\\"/g, '"')
+        .replace(/\\'/g, "'")
+        .replace(/\s+/g, ' ')
+        .trim();
 }
 
 function toLineNumber(value: unknown, maxLine: number): number | null {
