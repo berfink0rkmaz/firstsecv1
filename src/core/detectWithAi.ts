@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { callAI } from '../api/gemini';
+import { callAI } from '../api/AiApi';
 import { generateDetectionPrompt, generateSelectionDetectionPrompt } from '../prompts/detectPrompt';
 import type { Vulnerability } from '../types/vulnerability';
 import { isProtectedFile } from '../utils/protectedFiles';

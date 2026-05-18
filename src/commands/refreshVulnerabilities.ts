@@ -1,5 +1,5 @@
 import { showError, showInfo } from '../utils/errorHandler';
-import { loadDetectionSnapshot } from '../core/detectGemini';
+import { loadDetectionSnapshot } from '../core/detectWithAi';
 import { getLegacyVulnerabilityStatusKey, getVulnerabilityStatusKey, loadStatuses } from '../core/statusStore';
 import { setStatusFilter } from './filterByStatus';
 

@@ -5494,7 +5494,7 @@ module.exports = __toCommonJS(extension_exports);
 var vscode15 = __toESM(require("vscode"));
 var path7 = __toESM(require("path"));
 
-// src/core/detectGemini.ts
+// src/core/detectWithAi.ts
 var vscode3 = __toESM(require("vscode"));
 var fs3 = __toESM(require("fs"));
 var path2 = __toESM(require("path"));
@@ -6982,7 +6982,7 @@ var CostTracker = class {
 };
 var costTracker = new CostTracker();
 
-// src/api/gemini.ts
+// src/api/AiApi.ts
 async function callAI(prompt, provider, apiKey, model, operation = "auto-fix", filePath) {
   if (!apiKey) throw new Error("API key is not set in settings.");
   const estimatedInputTokens = Math.ceil(prompt.length / 4);
@@ -7246,7 +7246,7 @@ function isProtectedFile(filePath) {
   return patterns.some((pattern) => globToRegExp(pattern).test(normalizedPath));
 }
 
-// src/core/detectGemini.ts
+// src/core/detectWithAi.ts
 var DEFAULT_INCLUDE = "**/*.{java,py,c,cc,cpp,h,hpp}";
 var DEFAULT_EXCLUDE = "**/{node_modules,dist,out,build,target,.git,coverage,.next,.nuxt,vendor}/**";
 var MAX_FILES = 25;
@@ -7614,7 +7614,7 @@ function showInfo(message) {
 function showWarning(message) {
   vscode4.window.showWarningMessage(message);
 }
-function handleGeminiError(error) {
+function handleAIError(error) {
   const errorMsg = error.message || String(error);
   if (errorMsg.includes("429")) {
     showError("Gemini API quota exceeded. Please wait a while, reduce usage, or upgrade your plan to continue using AI-powered fixes.");
@@ -8154,7 +8154,7 @@ ${getPromptForIssue(vuln)}`;
     output.appendLine(`AI API error for ${vuln.filePath}:${vuln.line}`);
     output.appendLine(errorMsg);
     output.show(true);
-    if (providerStr === "gemini") handleGeminiError(err);
+    if (providerStr === "gemini") handleAIError(err);
     else if (providerStr === "openai") handleOpenAIError(err);
     else if (providerStr === "claude") handleClaudeError(err);
     else showError("AI API error: " + errorMsg, err);
@@ -8230,8 +8230,9 @@ These files contain sensitive configuration, credentials, or system files that s
   const securityWarning = securitySummary ? `
 
 ${securitySummary}` : "";
+  const providerLabel = providerStr === "openai" ? "OpenAI" : providerStr === "claude" ? "Claude" : providerStr === "gemini" ? "Gemini AI" : "AI";
   const proceed = await vscode6.window.showInformationMessage(
-    `Gemini AI suggests fixes for the following file(s):
+    `${providerLabel} suggests fixes for the following file(s):
 ${fileList}${securityWarning}
 Proceed to review each fix?`,
     "Proceed",
@@ -8330,7 +8331,7 @@ Proceed to review each fix?`,
       }
       try {
         await repo.add([]);
-        await repo.commit("Auto-fix vulnerabilities with Gemini security scan");
+        await repo.commit(`Auto-fix vulnerabilities with ${providerLabel} security scan`);
         showInfo("Committed auto-fixes!");
       } catch (err) {
         const errorMsg = err.message || String(err);

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { detectBatchOpportunities, validateBatchProcessing, type BatchGroup } from '../core/batchProcessor';
 import { generateBatchPrompt } from '../prompts/batchPrompt';
-import { callAI } from '../api/gemini';
+import { callAI } from '../api/AiApi';
 import { showError, showInfo, showWarning } from '../utils/errorHandler';
 import { costTracker } from '../utils/costTracker';
 import type { Vulnerability } from '../types/vulnerability';

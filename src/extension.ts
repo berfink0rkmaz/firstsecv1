@@ -4,7 +4,7 @@ import {
     detectVulnerabilitiesWithOpenAI,
     detectVulnerabilitiesInCurrentFile,
     detectVulnerabilitiesInSelection
-} from './core/detectGemini';
+} from './core/detectWithAi';
 import { showError, showInfo } from './utils/errorHandler';
 import { autoFixAll } from './commands/autoFixAll';
 import { autoFixSelected } from './commands/autoFixSelected';
