@@ -71,7 +71,7 @@ export function activate(context: vscode.ExtensionContext) {
         setLastDetectionContext(workspaceRoot);
         const vulns = await detectVulnerabilitiesInCurrentFile(workspaceRoot, editor.document);
         applyStoredStatuses(workspaceRoot, vulns);
-        provider.setVulnerabilities(vulns);
+        provider.replaceVulnerabilitiesForFile(vscode.workspace.asRelativePath(editor.document.uri, false), vulns);
         showInfo(`Detected ${vulns.length} vulnerabilities in the current file.`);
         resetAutoFixCount();
         setTotalVulns(vulns.length);
@@ -96,7 +96,7 @@ export function activate(context: vscode.ExtensionContext) {
         setLastDetectionContext(workspaceRoot);
         const vulns = await detectVulnerabilitiesInSelection(workspaceRoot, editor.document, editor.selection);
         applyStoredStatuses(workspaceRoot, vulns);
-        provider.setVulnerabilities(vulns);
+        provider.replaceVulnerabilitiesForFile(vscode.workspace.asRelativePath(editor.document.uri, false), vulns);
         showInfo(`Detected ${vulns.length} vulnerabilities in the current selection.`);
         resetAutoFixCount();
         setTotalVulns(vulns.length);
@@ -193,11 +193,18 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('firstsec.fixSelected', async () => {
             await autoFixSelected(treeView, autoFixVulnerability);
         }),
-        vscode.commands.registerCommand('firstsec.markFalsePositive', async () => {
-            await markFalsePositive(treeView, provider);
+        vscode.commands.registerCommand('firstsec.markFalsePositive', async (item?: VulnerabilityTreeItem) => {
+            await markFalsePositive(item?.vuln ? { selection: [item] } : treeView, provider);
         }),
-        vscode.commands.registerCommand('firstsec.undoFalsePositive', async () => {
+        vscode.commands.registerCommand('firstsec.undoFalsePositive', async (item?: VulnerabilityTreeItem) => {
+            if (item?.vuln) {
+                await undoFalsePositiveSingle(item.vuln, provider);
+                provider.refresh();
+                return;
+            }
+
             await undoFalsePositive(treeView, provider);
+            provider.refresh();
         }),
         vscode.commands.registerCommand('firstsec.showFalsePositivesForUndo', async () => {
             await showFalsePositivesForUndo(provider);
