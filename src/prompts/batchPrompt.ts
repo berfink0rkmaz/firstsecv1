@@ -1,78 +1,87 @@
 import type { BatchGroup } from '../core/batchProcessor';
 
-/**
- * Creates a comprehensive prompt for batch fixing multiple vulnerabilities
- */
 export function generateBatchPrompt(batchGroup: BatchGroup): string {
     const { filePath, vulnType, vulnerabilities } = batchGroup;
-    
-    const codeSnippets = vulnerabilities
+
+    const findings = vulnerabilities
         .map(v => `Line ${v.line}: ${v.codeSnippet}`)
-        .join('\n');
-    
-    const severityInfo = vulnerabilities
-        .map(v => `Line ${v.line}: ${v.severity} severity`)
-        .join(', ');
-    
+        .join('\n\n');
+
     return `
-You are a software security expert. Multiple ${vulnType} vulnerabilities have been detected in the same file:
+You are fixing multiple vulnerabilities in the SAME file.
 
-📂 File: ${filePath}
-🧨 Type: ${vulnType}
-📊 Count: ${vulnerabilities.length} vulnerabilities
-📍 Locations: ${severityInfo}
+Your job is to fix all listed vulnerabilities without damaging the file.
 
-🔍 Here's what I expect from you:
-1. Analyze ALL vulnerabilities together to understand the root cause.        #change all together is too much, but we can say analyze all vulnerabilities in the file together to understand the root cause. maybe.
-2. Provide a comprehensive fix that addresses ALL instances consistently.   
-3. The project uses layered architecture: Controller → Service → Repository.
-4. Apply corrections in all necessary layers, not just superficially.
-5. Do NOT delete or replace unrelated code. Only change the lines that are necessary. #doesnt listen this
-6. Do NOT replace the entire file unless absolutely necessary.
+TARGET FILE
+File: ${filePath}
+Vulnerability Type: ${vulnType}
+Count: ${vulnerabilities.length}
 
-🔐 Vulnerable Code Snippets:
-------------------
-${codeSnippets}
-------------------
+VULNERABLE CODE
+${findings}
 
-Respond in the following format (only return actual code in blocks, no extra commentary):
+VERY IMPORTANT RULES
+- Fix ONLY the listed vulnerabilities.
+- Change ONLY the affected parts of the file.
+- Do NOT change a different function by mistake.
+- Do NOT delete any function.
+- Do NOT delete function logic.
+- Do NOT replace real logic with an empty body, null, placeholder, or a simple return.
+- Do NOT shorten the file by removing code.
+- Do NOT rewrite the whole file.
+- Keep all existing business logic.
+- Keep all unrelated code exactly as it is.
+- Apply one consistent fix pattern to the listed vulnerabilities.
+- If another file is absolutely necessary, include it. Otherwise do not touch any other file.
 
-# Explanation:
-Brief explanation of the comprehensive fix approach.
+OUTPUT RULES
+- Return ONLY code blocks.
+- Do NOT write explanations.
+- Do NOT write notes.
+- Do NOT write markdown text except file headers.
+- The first file must be exactly this file: ${filePath}
+
+OUTPUT FORMAT
 
 # ${filePath}
 \`\`\`${getFileExtension(filePath)}
-// Comprehensive fix for all ${vulnType} vulnerabilities
+[fixed code]
 \`\`\`
 
-# Additional files (if needed)
-\`\`\`filename.ext
-// Additional fixes for other layers
+If another file is absolutely required, add:
+
+# relative/path/to/OtherFile.ext
 \`\`\`
+[fixed code]
+\`\`\`
+
+FINAL CHECK BEFORE ANSWERING
+- Did you fix only the listed vulnerabilities?
+- Did you keep the original logic?
+- Did you avoid deleting code?
+- Did you avoid replacing code with a trivial return?
+- Did you avoid rewriting the whole file?
 `;
 }
 
-/**
- * Gets file extension for code block syntax highlighting
- */
 function getFileExtension(filePath: string): string {
     const ext = filePath.split('.').pop()?.toLowerCase();
     const extensionMap: { [key: string]: string } = {
-        'java': 'java',
-        'js': 'javascript',
-        'ts': 'typescript',
-        'py': 'python',
-        'cs': 'csharp',
-        'cpp': 'cpp',
-        'c': 'c',
-        'go': 'go',
-        'rb': 'ruby',
-        'php': 'php',
-        'kt': 'kotlin',
-        'scala': 'scala',
-        'swift': 'swift',
-        'rs': 'rust'
+        java: 'java',
+        js: 'javascript',
+        ts: 'typescript',
+        py: 'python',
+        cs: 'csharp',
+        cpp: 'cpp',
+        c: 'c',
+        go: 'go',
+        rb: 'ruby',
+        php: 'php',
+        kt: 'kotlin',
+        scala: 'scala',
+        swift: 'swift',
+        rs: 'rust'
     };
-    
+
     return extensionMap[ext || ''] || 'text';
-} 
+}
