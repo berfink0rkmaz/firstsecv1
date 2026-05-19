@@ -87,6 +87,26 @@
           },
           "description": "Glob patterns for files that FirstSec must never send to AI or modify. Works like a security-focused .gitignore list."
         },
+        "firstsec.distilbertEndpoint": {
+          "type": "string",
+          "default": "http://127.0.0.1:8000",
+          "description": "DistilBERT detection service endpoint."
+        },
+        "firstsec.distilbertModelPath": {
+          "type": "string",
+          "default": "C:\\Users\\Fatma\\models\\distilbert_datasetB_best",
+          "description": "Local folder containing the saved DistilBERT model and tokenizer files."
+        },
+        "firstsec.distilbertPythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Python executable used to run the DistilBERT detection service."
+        },
+        "firstsec.autoStartDistilbertService": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically start the local DistilBERT detection service when FirstSec activates."
+        },
         "firstsec.openaiApiKey": {
           "type": "string",
           "default": "",
@@ -120,12 +140,12 @@
     "commands": [
       {
         "command": "firstsec.loadScanReport",
-        "title": "Run OpenAI Security Scan",
+        "title": "Run DistilBERT Security Scan",
         "icon": "$(search)"
       },
       {
         "command": "firstsec.rescanWithOpenAI",
-        "title": "Rescan with OpenAI",
+        "title": "Rescan with DistilBERT",
         "icon": "$(sync)"
       },
       {
