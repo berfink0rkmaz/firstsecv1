@@ -16,6 +16,7 @@ import { autoFixVulnerability, setTotalVulns, resetAutoFixCount } from './core/a
 import { getLegacyVulnerabilityStatusKey, getVulnerabilityStatusKey, loadStatuses } from './core/statusStore';
 import { refreshVulnerabilities, setLastDetectionContext } from './commands/refreshVulnerabilities';
 import { showCostReport, exportCostData, clearCostData } from './commands/costReport';
+import { exportVulnerabilities } from './commands/exportVulnerabilities';
 import { showBatchOpportunityForVulnerability, showBatchOpportunities } from './commands/batchFix';
 import { detectBatchOpportunities } from './core/batchProcessor';
 import { FirstSecVulnerabilityProvider, SeverityTreeItem, VulnerabilityTreeItem } from './ui/FirstSecVulnerabilityProvider';
@@ -97,10 +98,10 @@ export function activate(context: vscode.ExtensionContext) {
         setLastDetectionContext(workspaceRoot);
         const vulns = await detectVulnerabilitiesInSelection(workspaceRoot, editor.document, editor.selection);
         applyStoredStatuses(workspaceRoot, vulns);
-        provider.replaceVulnerabilitiesForFile(vscode.workspace.asRelativePath(editor.document.uri, false), vulns);
-        showInfo(`Detected ${vulns.length} vulnerabilities in the current selection.`);
+        provider.addVulnerabilities(vulns);
+        showInfo(`Added ${vulns.length} vulnerabilities from the current selection.`);
         resetAutoFixCount();
-        setTotalVulns(vulns.length);
+        setTotalVulns(provider.getAllVulnerabilities().length);
     }
 
     function applyStoredStatuses(workspaceRoot: string, vulns: VulnerabilityTreeItem['vuln'][]) {
@@ -147,6 +148,23 @@ export function activate(context: vscode.ExtensionContext) {
         }),
         vscode.commands.registerCommand('firstsec.refreshVulnerabilities', async () => {
             await refreshVulnerabilities(provider, provider.setVulnerabilities.bind(provider), resetAutoFixCount, setTotalVulns);
+        }),
+        vscode.commands.registerCommand('firstsec.clearVulnerabilities', async () => {
+            const choice = await vscode.window.showWarningMessage(
+                'Clear all currently displayed vulnerabilities from the explorer?',
+                'Clear Vulnerabilities',
+                'Cancel'
+            );
+            if (choice !== 'Clear Vulnerabilities') {
+                return;
+            }
+            provider.clearVulnerabilities();
+            resetAutoFixCount();
+            setTotalVulns(0);
+            showInfo('Cleared vulnerabilities from the explorer.');
+        }),
+        vscode.commands.registerCommand('firstsec.exportVulnerabilities', async () => {
+            await exportVulnerabilities(provider);
         }),
         vscode.commands.registerCommand('firstsec.showVulnerabilityDetails', async (item: VulnerabilityTreeItem) => {
             const v = item.vuln;

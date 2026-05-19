@@ -14,6 +14,8 @@
     "onCommand:firstsec.rescanWithOpenAI",
     "onCommand:firstsec.scanCurrentFile",
     "onCommand:firstsec.scanCurrentSelection",
+    "onCommand:firstsec.exportVulnerabilities",
+    "onCommand:firstsec.clearVulnerabilities",
     "onCommand:firstsec.fixAll",
     "onCommand:firstsec.fixSelected",
     "onCommand:firstsec.filterByStatus",
@@ -180,6 +182,16 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "firstsec.exportVulnerabilities",
+        "title": "FirstSec: Export Vulnerabilities",
+        "icon": "$(download)"
+      },
+      {
+        "command": "firstsec.clearVulnerabilities",
+        "title": "FirstSec: Clear Vulnerabilities",
+        "icon": "$(clear-all)"
+      },
+      {
         "command": "firstsec.buildProject",
         "title": "FirstSec: Build Project",
         "icon": "$(wrench)"
@@ -237,7 +249,7 @@
           "group": "navigation@6"
         },
         {
-          "command": "firstsec.showCostReport",
+          "command": "firstsec.exportVulnerabilities",
           "when": "view == firstsecVulnerabilityExplorer",
           "group": "navigation@7"
         }
