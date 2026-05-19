@@ -21,9 +21,9 @@ export async function refreshVulnerabilities(provider: any, setVulnerabilities: 
             const key = getVulnerabilityStatusKey(v);
             const legacyKey = getLegacyVulnerabilityStatusKey(v);
             if (statusMap[key]) {
-                v.status = statusMap[key] as 'open' | 'fixed' | 'false_positive';
+                v.status = statusMap[key] as 'open' | 'fixed' | 'false_positive' | 'needs_attention';
             } else if (statusMap[legacyKey]) {
-                v.status = statusMap[legacyKey] as 'open' | 'fixed' | 'false_positive';
+                v.status = statusMap[legacyKey] as 'open' | 'fixed' | 'false_positive' | 'needs_attention';
             }
         }
         provider.setVulnerabilities(vulns);

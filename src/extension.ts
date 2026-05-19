@@ -10,6 +10,7 @@ import { autoFixAll } from './commands/autoFixAll';
 import { autoFixSelected } from './commands/autoFixSelected';
 import { markFalsePositive } from './commands/markFalsePositive';
 import { undoFalsePositive, undoFalsePositiveSingle, showFalsePositivesForUndo } from './commands/undoFalsePositive';
+import { setVulnerabilityStatus } from './commands/setVulnerabilityStatus';
 import { filterByStatus, currentStatusFilter } from './commands/filterByStatus';
 import { autoFixVulnerability, setTotalVulns, resetAutoFixCount } from './core/autoFixVulnerability';
 import { getLegacyVulnerabilityStatusKey, getVulnerabilityStatusKey, loadStatuses } from './core/statusStore';
@@ -195,6 +196,12 @@ export function activate(context: vscode.ExtensionContext) {
         }),
         vscode.commands.registerCommand('firstsec.markFalsePositive', async (item?: VulnerabilityTreeItem) => {
             await markFalsePositive(item?.vuln ? { selection: [item] } : treeView, provider);
+        }),
+        vscode.commands.registerCommand('firstsec.markFixed', async (item?: VulnerabilityTreeItem) => {
+            await setVulnerabilityStatus(item?.vuln ? { selection: [item] } : treeView, provider, 'fixed');
+        }),
+        vscode.commands.registerCommand('firstsec.markNeedsAttention', async (item?: VulnerabilityTreeItem) => {
+            await setVulnerabilityStatus(item?.vuln ? { selection: [item] } : treeView, provider, 'needs_attention');
         }),
         vscode.commands.registerCommand('firstsec.undoFalsePositive', async (item?: VulnerabilityTreeItem) => {
             if (item?.vuln) {

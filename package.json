@@ -159,6 +159,14 @@
         "title": "FirstSec: Mark False Positive"
       },
       {
+        "command": "firstsec.markFixed",
+        "title": "FirstSec: Mark Fixed"
+      },
+      {
+        "command": "firstsec.markNeedsAttention",
+        "title": "FirstSec: Mark Needs Attention"
+      },
+      {
         "command": "firstsec.undoFalsePositive",
         "title": "FirstSec: Undo False Positive"
       },
@@ -258,9 +266,19 @@
           "group": "inline@3"
         },
         {
-          "command": "firstsec.undoFalsePositive",
+          "command": "firstsec.markFixed",
           "when": "view == firstsecVulnerabilityExplorer && viewItem == vulnerability",
           "group": "inline@4"
+        },
+        {
+          "command": "firstsec.markNeedsAttention",
+          "when": "view == firstsecVulnerabilityExplorer && viewItem == vulnerability",
+          "group": "inline@5"
+        },
+        {
+          "command": "firstsec.undoFalsePositive",
+          "when": "view == firstsecVulnerabilityExplorer && viewItem == vulnerability",
+          "group": "inline@6"
         }
       ]
     }

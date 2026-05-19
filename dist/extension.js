@@ -7614,7 +7614,7 @@ function showInfo(message) {
 function showWarning(message) {
   vscode4.window.showWarningMessage(message);
 }
-function handleAIError(error) {
+function handleGeminiError(error) {
   const errorMsg = error.message || String(error);
   if (errorMsg.includes("429")) {
     showError("Gemini API quota exceeded. Please wait a while, reduce usage, or upgrade your plan to continue using AI-powered fixes.");
@@ -8021,7 +8021,7 @@ async function commitAndPush() {
   }
   try {
     await repo.add([]);
-    await repo.commit("Auto-fix vulnerabilities with Gemini security scan");
+    await repo.commit("Auto-fix vulnerabilities with AI security scan");
     await repo.push();
     showInfo("Committed and pushed auto-fixes!");
   } catch (err) {
@@ -8154,7 +8154,7 @@ ${getPromptForIssue(vuln)}`;
     output.appendLine(`AI API error for ${vuln.filePath}:${vuln.line}`);
     output.appendLine(errorMsg);
     output.show(true);
-    if (providerStr === "gemini") handleAIError(err);
+    if (providerStr === "gemini") handleGeminiError(err);
     else if (providerStr === "openai") handleOpenAIError(err);
     else if (providerStr === "claude") handleClaudeError(err);
     else showError("AI API error: " + errorMsg, err);
