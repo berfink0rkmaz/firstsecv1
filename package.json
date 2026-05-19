@@ -265,32 +265,32 @@
         {
           "command": "firstsec.showVulnerabilityDetails",
           "when": "view == firstsecVulnerabilityExplorer && viewItem == vulnerability",
-          "group": "inline@1"
+          "group": "navigation@1"
         },
         {
           "command": "firstsec.fixSelected",
           "when": "view == firstsecVulnerabilityExplorer && viewItem == vulnerability",
-          "group": "inline@2"
+          "group": "navigation@2"
         },
         {
           "command": "firstsec.markFalsePositive",
           "when": "view == firstsecVulnerabilityExplorer && viewItem == vulnerability",
-          "group": "inline@3"
+          "group": "navigation@3"
         },
         {
           "command": "firstsec.markFixed",
           "when": "view == firstsecVulnerabilityExplorer && viewItem == vulnerability",
-          "group": "inline@4"
+          "group": "navigation@4"
         },
         {
           "command": "firstsec.markNeedsAttention",
           "when": "view == firstsecVulnerabilityExplorer && viewItem == vulnerability",
-          "group": "inline@5"
+          "group": "navigation@5"
         },
         {
           "command": "firstsec.undoFalsePositive",
           "when": "view == firstsecVulnerabilityExplorer && viewItem == vulnerability",
-          "group": "inline@6"
+          "group": "navigation@6"
         }
       ]
     }

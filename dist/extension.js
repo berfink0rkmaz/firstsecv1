@@ -5491,7 +5491,7 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode15 = __toESM(require("vscode"));
+var vscode17 = __toESM(require("vscode"));
 var path7 = __toESM(require("path"));
 
 // src/core/detectWithAi.ts
@@ -8766,8 +8766,29 @@ async function showFalsePositivesForUndo(provider) {
   showInfo(`Successfully undone false positive marking for ${updatedCount} vulnerability${updatedCount > 1 ? "ies" : ""}.`);
 }
 
-// src/commands/filterByStatus.ts
+// src/commands/setVulnerabilityStatus.ts
 var vscode12 = __toESM(require("vscode"));
+async function setVulnerabilityStatus(treeView, provider, status) {
+  try {
+    const selected = treeView.selection.filter((item) => item && item.vuln);
+    if (!selected.length) {
+      showInfo("No vulnerabilities selected.");
+      return;
+    }
+    for (const item of selected) {
+      item.vuln.status = status;
+    }
+    provider.refresh();
+    const workspaceRoot = vscode12.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+    saveStatuses(provider.getAllVulnerabilities(), workspaceRoot);
+    showInfo(`Marked as ${status.replace("_", " ")}.`);
+  } catch (err) {
+    showError(`Failed to mark as ${status.replace("_", " ")}.`, err);
+  }
+}
+
+// src/commands/filterByStatus.ts
+var vscode13 = __toESM(require("vscode"));
 var currentStatusFilter = "all";
 function setStatusFilter(value) {
   currentStatusFilter = value;
@@ -8775,7 +8796,7 @@ function setStatusFilter(value) {
 async function filterByStatus(provider) {
   try {
     await showInfo("Filter By Status command triggered");
-    const status = await vscode12.window.showQuickPick(
+    const status = await vscode13.window.showQuickPick(
       ["all", "open", "fixed", "false_positive", "needs_attention"],
       { placeHolder: "Filter vulnerabilities by status" }
     );
@@ -8821,7 +8842,7 @@ async function refreshVulnerabilities(provider, setVulnerabilities, resetAutoFix
 }
 
 // src/commands/costReport.ts
-var vscode13 = __toESM(require("vscode"));
+var vscode14 = __toESM(require("vscode"));
 var path6 = __toESM(require("path"));
 async function showCostReport() {
   const summary = costTracker.getCostSummary(30);
@@ -8866,7 +8887,7 @@ ${Object.entries(summary.costByModel).map(([model, cost]) => `\u2022 ${model}: $
 \u2022 Clear cost data to reset tracking
 \u2022 Adjust AI provider settings for cost optimization
 `;
-  const output = vscode13.window.createOutputChannel("Security Scan Cost Report");
+  const output = vscode14.window.createOutputChannel("Security Scan Cost Report");
   output.clear();
   output.appendLine(report);
   output.show(true);
@@ -8874,24 +8895,24 @@ ${Object.entries(summary.costByModel).map(([model, cost]) => `\u2022 ${model}: $
 }
 async function exportCostData() {
   const csvData = costTracker.exportToCSV();
-  const workspaceRoot = vscode13.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const workspaceRoot = vscode14.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!workspaceRoot) {
     showInfo("No workspace open. Cannot export cost data.");
     return;
   }
   const fileName = `firstsec-costs-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.csv`;
-  const filePath = vscode13.Uri.file(path6.join(workspaceRoot, fileName));
+  const filePath = vscode14.Uri.file(path6.join(workspaceRoot, fileName));
   try {
-    await vscode13.workspace.fs.writeFile(filePath, Buffer.from(csvData, "utf-8"));
+    await vscode14.workspace.fs.writeFile(filePath, Buffer.from(csvData, "utf-8"));
     showInfo(`Cost data exported to: ${fileName}`);
-    const document = await vscode13.workspace.openTextDocument(filePath);
-    await vscode13.window.showTextDocument(document);
+    const document = await vscode14.workspace.openTextDocument(filePath);
+    await vscode14.window.showTextDocument(document);
   } catch (error) {
     showInfo(`Failed to export cost data: ${error}`);
   }
 }
 async function clearCostData() {
-  const result = await vscode13.window.showWarningMessage(
+  const result = await vscode14.window.showWarningMessage(
     "Are you sure you want to clear all cost data? This action cannot be undone.",
     "Clear All Data",
     "Cancel"
@@ -8902,11 +8923,51 @@ async function clearCostData() {
   }
 }
 
+// src/commands/exportVulnerabilities.ts
+var vscode15 = __toESM(require("vscode"));
+async function exportVulnerabilities(provider) {
+  const vulnerabilities = provider.getAllVulnerabilities();
+  if (!vulnerabilities.length) {
+    showInfo("No vulnerabilities available to export.");
+    return;
+  }
+  const workspaceRoot = vscode15.workspace.workspaceFolders?.[0]?.uri;
+  const defaultUri = workspaceRoot ? vscode15.Uri.joinPath(workspaceRoot, `firstsec-vulnerabilities-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`) : void 0;
+  const targetUri = await vscode15.window.showSaveDialog({
+    defaultUri,
+    filters: {
+      JSON: ["json"]
+    },
+    saveLabel: "Export Vulnerabilities"
+  });
+  if (!targetUri) {
+    return;
+  }
+  const exported = vulnerabilities.map((v) => ({
+    category: v.category,
+    filePath: v.filePath,
+    line: v.line,
+    severity: v.severity,
+    abstract: v.abstract,
+    codeSnippet: v.codeSnippet,
+    status: v.status
+  }));
+  try {
+    await vscode15.workspace.fs.writeFile(
+      targetUri,
+      Buffer.from(JSON.stringify(exported, null, 2), "utf-8")
+    );
+    showInfo(`Exported ${exported.length} vulnerabilities.`);
+  } catch (error) {
+    showError("Failed to export vulnerabilities.", error);
+  }
+}
+
 // src/extension.ts
 init_batchProcessor();
 
 // src/ui/FirstSecVulnerabilityProvider.ts
-var vscode14 = __toESM(require("vscode"));
+var vscode16 = __toESM(require("vscode"));
 
 // src/core/group.ts
 function groupBySeverity(vulns) {
@@ -8922,23 +8983,23 @@ function getSortedSeverityKeys(grouped) {
 }
 
 // src/ui/FirstSecVulnerabilityProvider.ts
-var BaseTreeItem = class extends vscode14.TreeItem {
+var BaseTreeItem = class extends vscode16.TreeItem {
 };
 var SeverityTreeItem = class extends BaseTreeItem {
   constructor(severity, count) {
-    super(`${severity} (${count})`, vscode14.TreeItemCollapsibleState.Collapsed);
+    super(`${severity} (${count})`, vscode16.TreeItemCollapsibleState.Collapsed);
     this.severity = severity;
   }
   severity;
 };
-var VulnerabilityTreeItem = class extends vscode14.TreeItem {
+var VulnerabilityTreeItem = class extends vscode16.TreeItem {
   constructor(vuln) {
-    super(`${vuln.category} [${vuln.filePath}:${vuln.line}]`, vscode14.TreeItemCollapsibleState.None);
+    super(`${vuln.category} [${vuln.filePath}:${vuln.line}]`, vscode16.TreeItemCollapsibleState.None);
     this.vuln = vuln;
     this.description = vuln.abstract;
     this.tooltip = `${vuln.category}
 ${vuln.filePath}:${vuln.line}`;
-    this.iconPath = new vscode14.ThemeIcon("bug");
+    this.iconPath = new vscode16.ThemeIcon("bug");
     this.command = {
       command: "firstsec.showVulnerabilityDetails",
       title: "Show Vulnerability Details",
@@ -8949,7 +9010,7 @@ ${vuln.filePath}:${vuln.line}`;
   vuln;
 };
 var FirstSecVulnerabilityProvider = class {
-  _onDidChangeTreeData = new vscode14.EventEmitter();
+  _onDidChangeTreeData = new vscode16.EventEmitter();
   onDidChangeTreeData = this._onDidChangeTreeData.event;
   vulnerabilities = [];
   getTreeItem(element) {
@@ -8974,6 +9035,27 @@ var FirstSecVulnerabilityProvider = class {
     this.vulnerabilities = vulns.map((v) => ({ ...v, status: v.status || "open" }));
     this._onDidChangeTreeData.fire();
   }
+  replaceVulnerabilitiesForFile(filePath, vulns) {
+    const normalizedFilePath = normalizeFilePath(filePath);
+    const nextVulns = vulns.map((v) => ({ ...v, status: v.status || "open" }));
+    this.vulnerabilities = [
+      ...this.vulnerabilities.filter((v) => normalizeFilePath(v.filePath) !== normalizedFilePath),
+      ...nextVulns
+    ];
+    this._onDidChangeTreeData.fire();
+  }
+  addVulnerabilities(vulns) {
+    const existing = new Map(this.vulnerabilities.map((v) => [getVulnerabilityIdentity(v), v]));
+    for (const vuln of vulns) {
+      existing.set(getVulnerabilityIdentity(vuln), { ...vuln, status: vuln.status || "open" });
+    }
+    this.vulnerabilities = [...existing.values()];
+    this._onDidChangeTreeData.fire();
+  }
+  clearVulnerabilities() {
+    this.vulnerabilities = [];
+    this._onDidChangeTreeData.fire();
+  }
   getAllVulnerabilities() {
     return this.vulnerabilities;
   }
@@ -8981,16 +9063,27 @@ var FirstSecVulnerabilityProvider = class {
     this._onDidChangeTreeData.fire();
   }
 };
+function normalizeFilePath(filePath) {
+  return filePath.replace(/\\/g, "/");
+}
+function getVulnerabilityIdentity(vuln) {
+  return [
+    normalizeFilePath(vuln.filePath),
+    vuln.line,
+    vuln.category,
+    vuln.abstract
+  ].join("::");
+}
 
 // src/extension.ts
 function activate(context) {
   const provider = new FirstSecVulnerabilityProvider();
-  const treeView = vscode15.window.createTreeView("firstsecVulnerabilityExplorer", {
+  const treeView = vscode17.window.createTreeView("firstsecVulnerabilityExplorer", {
     treeDataProvider: provider,
     canSelectMany: true
   });
   async function runOpenAIScan() {
-    const workspaceRoot = vscode15.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+    const workspaceRoot = vscode17.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
     if (!workspaceRoot) {
       showError("Open a workspace folder before running OpenAI detection.");
       return;
@@ -9004,7 +9097,7 @@ function activate(context) {
     setTotalVulns(vulns.length);
     const batchOpportunity = detectBatchOpportunities(vulns);
     if (batchOpportunity.totalBatches > 0) {
-      const choice = await vscode15.window.showInformationMessage(
+      const choice = await vscode17.window.showInformationMessage(
         `Found ${batchOpportunity.totalBatches} batch opportunities for ${batchOpportunity.totalVulnerabilities} vulnerabilities.`,
         "Enable Batch Mode",
         "Continue with Individual Mode"
@@ -9015,8 +9108,8 @@ function activate(context) {
     }
   }
   async function runCurrentFileScan() {
-    const workspaceRoot = vscode15.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
-    const editor = vscode15.window.activeTextEditor;
+    const workspaceRoot = vscode17.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+    const editor = vscode17.window.activeTextEditor;
     if (!workspaceRoot) {
       showError("Open a workspace folder before running OpenAI detection.");
       return;
@@ -9028,14 +9121,14 @@ function activate(context) {
     setLastDetectionContext(workspaceRoot);
     const vulns = await detectVulnerabilitiesInCurrentFile(workspaceRoot, editor.document);
     applyStoredStatuses(workspaceRoot, vulns);
-    provider.setVulnerabilities(vulns);
+    provider.replaceVulnerabilitiesForFile(vscode17.workspace.asRelativePath(editor.document.uri, false), vulns);
     showInfo(`Detected ${vulns.length} vulnerabilities in the current file.`);
     resetAutoFixCount();
     setTotalVulns(vulns.length);
   }
   async function runSelectionScan() {
-    const workspaceRoot = vscode15.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
-    const editor = vscode15.window.activeTextEditor;
+    const workspaceRoot = vscode17.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+    const editor = vscode17.window.activeTextEditor;
     if (!workspaceRoot) {
       showError("Open a workspace folder before running OpenAI detection.");
       return;
@@ -9051,10 +9144,10 @@ function activate(context) {
     setLastDetectionContext(workspaceRoot);
     const vulns = await detectVulnerabilitiesInSelection(workspaceRoot, editor.document, editor.selection);
     applyStoredStatuses(workspaceRoot, vulns);
-    provider.setVulnerabilities(vulns);
-    showInfo(`Detected ${vulns.length} vulnerabilities in the current selection.`);
+    provider.addVulnerabilities(vulns);
+    showInfo(`Added ${vulns.length} vulnerabilities from the current selection.`);
     resetAutoFixCount();
-    setTotalVulns(vulns.length);
+    setTotalVulns(provider.getAllVulnerabilities().length);
   }
   function applyStoredStatuses(workspaceRoot, vulns) {
     const statusMap = loadStatuses(workspaceRoot);
@@ -9069,38 +9162,55 @@ function activate(context) {
     }
   }
   context.subscriptions.push(
-    vscode15.commands.registerCommand("firstsec.loadScanReport", async () => {
+    vscode17.commands.registerCommand("firstsec.loadScanReport", async () => {
       try {
         await runOpenAIScan();
       } catch (e2) {
         showError("Failed to detect vulnerabilities with OpenAI: " + (e2.message || e2));
       }
     }),
-    vscode15.commands.registerCommand("firstsec.rescanWithOpenAI", async () => {
+    vscode17.commands.registerCommand("firstsec.rescanWithOpenAI", async () => {
       try {
         await runOpenAIScan();
       } catch (e2) {
         showError("Failed to rescan vulnerabilities with OpenAI: " + (e2.message || e2));
       }
     }),
-    vscode15.commands.registerCommand("firstsec.scanCurrentFile", async () => {
+    vscode17.commands.registerCommand("firstsec.scanCurrentFile", async () => {
       try {
         await runCurrentFileScan();
       } catch (e2) {
         showError("Failed to scan the current file with OpenAI: " + (e2.message || e2));
       }
     }),
-    vscode15.commands.registerCommand("firstsec.scanCurrentSelection", async () => {
+    vscode17.commands.registerCommand("firstsec.scanCurrentSelection", async () => {
       try {
         await runSelectionScan();
       } catch (e2) {
         showError("Failed to scan the current selection with OpenAI: " + (e2.message || e2));
       }
     }),
-    vscode15.commands.registerCommand("firstsec.refreshVulnerabilities", async () => {
+    vscode17.commands.registerCommand("firstsec.refreshVulnerabilities", async () => {
       await refreshVulnerabilities(provider, provider.setVulnerabilities.bind(provider), resetAutoFixCount, setTotalVulns);
     }),
-    vscode15.commands.registerCommand("firstsec.showVulnerabilityDetails", async (item) => {
+    vscode17.commands.registerCommand("firstsec.clearVulnerabilities", async () => {
+      const choice = await vscode17.window.showWarningMessage(
+        "Clear all currently displayed vulnerabilities from the explorer?",
+        "Clear Vulnerabilities",
+        "Cancel"
+      );
+      if (choice !== "Clear Vulnerabilities") {
+        return;
+      }
+      provider.clearVulnerabilities();
+      resetAutoFixCount();
+      setTotalVulns(0);
+      showInfo("Cleared vulnerabilities from the explorer.");
+    }),
+    vscode17.commands.registerCommand("firstsec.exportVulnerabilities", async () => {
+      await exportVulnerabilities(provider);
+    }),
+    vscode17.commands.registerCommand("firstsec.showVulnerabilityDetails", async (item) => {
       const v = item.vuln;
       const buttons = ["Go to Code", "Auto Fix"];
       if (v.status === "false_positive") {
@@ -9108,7 +9218,7 @@ function activate(context) {
       } else {
         buttons.push("Mark as False Positive");
       }
-      const result = await vscode15.window.showInformationMessage(
+      const result = await vscode17.window.showInformationMessage(
         `Category: ${v.category}
 File: ${v.filePath}
 Line: ${v.line}
@@ -9127,14 +9237,14 @@ ${v.codeSnippet}`,
           await autoFixVulnerability(v);
         }
       } else if (result === "Go to Code") {
-        const fileUri = vscode15.Uri.file(path7.resolve(vscode15.workspace.workspaceFolders?.[0]?.uri.fsPath || "", v.filePath));
-        const document = await vscode15.workspace.openTextDocument(fileUri);
-        const editor = await vscode15.window.showTextDocument(document);
+        const fileUri = vscode17.Uri.file(path7.resolve(vscode17.workspace.workspaceFolders?.[0]?.uri.fsPath || "", v.filePath));
+        const document = await vscode17.workspace.openTextDocument(fileUri);
+        const editor = await vscode17.window.showTextDocument(document);
         const lineIndex = v.line - 1;
         if (lineIndex >= 0 && lineIndex < document.lineCount) {
           const range = document.lineAt(lineIndex).range;
-          editor.revealRange(range, vscode15.TextEditorRevealType.InCenter);
-          editor.selection = new vscode15.Selection(range.start, range.end);
+          editor.revealRange(range, vscode17.TextEditorRevealType.InCenter);
+          editor.selection = new vscode17.Selection(range.start, range.end);
         }
       } else if (result === "Mark as False Positive") {
         await markFalsePositive({ selection: [item] }, provider);
@@ -9142,37 +9252,49 @@ ${v.codeSnippet}`,
         await undoFalsePositiveSingle(v, provider);
       }
     }),
-    vscode15.commands.registerCommand("firstsec.fixAll", async () => {
+    vscode17.commands.registerCommand("firstsec.fixAll", async () => {
       await autoFixAll(provider, autoFixVulnerability);
     }),
-    vscode15.commands.registerCommand("firstsec.fixSelected", async () => {
+    vscode17.commands.registerCommand("firstsec.fixSelected", async () => {
       await autoFixSelected(treeView, autoFixVulnerability);
     }),
-    vscode15.commands.registerCommand("firstsec.markFalsePositive", async () => {
-      await markFalsePositive(treeView, provider);
+    vscode17.commands.registerCommand("firstsec.markFalsePositive", async (item) => {
+      await markFalsePositive(item?.vuln ? { selection: [item] } : treeView, provider);
     }),
-    vscode15.commands.registerCommand("firstsec.undoFalsePositive", async () => {
+    vscode17.commands.registerCommand("firstsec.markFixed", async (item) => {
+      await setVulnerabilityStatus(item?.vuln ? { selection: [item] } : treeView, provider, "fixed");
+    }),
+    vscode17.commands.registerCommand("firstsec.markNeedsAttention", async (item) => {
+      await setVulnerabilityStatus(item?.vuln ? { selection: [item] } : treeView, provider, "needs_attention");
+    }),
+    vscode17.commands.registerCommand("firstsec.undoFalsePositive", async (item) => {
+      if (item?.vuln) {
+        await undoFalsePositiveSingle(item.vuln, provider);
+        provider.refresh();
+        return;
+      }
       await undoFalsePositive(treeView, provider);
+      provider.refresh();
     }),
-    vscode15.commands.registerCommand("firstsec.showFalsePositivesForUndo", async () => {
+    vscode17.commands.registerCommand("firstsec.showFalsePositivesForUndo", async () => {
       await showFalsePositivesForUndo(provider);
     }),
-    vscode15.commands.registerCommand("firstsec.filterByStatus", async () => {
+    vscode17.commands.registerCommand("firstsec.filterByStatus", async () => {
       await filterByStatus(provider);
     }),
-    vscode15.commands.registerCommand("firstsec.buildProject", async () => {
-      const terminal = vscode15.window.createTerminal({ name: "Security Scan Build" });
+    vscode17.commands.registerCommand("firstsec.buildProject", async () => {
+      const terminal = vscode17.window.createTerminal({ name: "Security Scan Build" });
       terminal.show();
       terminal.sendText("mvn clean install");
-      vscode15.window.showInformationMessage("Build started: mvn clean install");
+      vscode17.window.showInformationMessage("Build started: mvn clean install");
     }),
-    vscode15.commands.registerCommand("firstsec.showCostReport", async () => {
+    vscode17.commands.registerCommand("firstsec.showCostReport", async () => {
       await showCostReport();
     }),
-    vscode15.commands.registerCommand("firstsec.exportCostData", async () => {
+    vscode17.commands.registerCommand("firstsec.exportCostData", async () => {
       await exportCostData();
     }),
-    vscode15.commands.registerCommand("firstsec.clearCostData", async () => {
+    vscode17.commands.registerCommand("firstsec.clearCostData", async () => {
       await clearCostData();
     })
   );
