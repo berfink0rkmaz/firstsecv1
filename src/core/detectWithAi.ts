@@ -1,11 +1,12 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { callDistilBertDetection } from '../api/distilbertApi';
+import { callAI } from '../api/AiApi';
+import { generateDetectionPrompt, generateSelectionDetectionPrompt } from '../prompts/detectPrompt';
 import type { Vulnerability } from '../types/vulnerability';
 import { isProtectedFile } from '../utils/protectedFiles';
 
-type DetectionFinding = {
+type GeminiFinding = {
     category?: unknown;
     filePath?: unknown;
     line?: unknown;
@@ -14,8 +15,8 @@ type DetectionFinding = {
     codeSnippet?: unknown;
 };
 
-type DetectionResponse = {
-    vulnerabilities?: DetectionFinding[];
+type GeminiDetectionResponse = {
+    vulnerabilities?: GeminiFinding[];
 };
 
 type ScanFile = {
@@ -30,15 +31,20 @@ const DEFAULT_EXCLUDE = '**/{node_modules,dist,out,build,target,.git,coverage,.n
 const MAX_FILES = 25;
 const MAX_FILE_SIZE = 20_000;
 const MAX_NEIGHBORS = 3;
-const DETECTION_SNAPSHOT_FILE = '.distilbert-detection.json';
+const DETECTION_SNAPSHOT_FILE = '.openai-detection.json';
 
 export async function detectVulnerabilitiesWithOpenAI(workspaceRoot: string): Promise<Vulnerability[]> {
-    const endpoint = getDistilBertEndpoint();
+    const apiKey = getApiKey();
+    const model = getModel();
+
     const files = await collectFiles(workspaceRoot);
     const vulnerabilities: Vulnerability[] = [];
 
     for (const file of files) {
-        const parsed = await callDistilBertDetection(endpoint, file.filePath, file.content);
+        const neighbors = pickNeighborFiles(file, files);
+        const prompt = buildPrompt(file, neighbors);
+        const rawResponse = await callAI(prompt, 'openai', apiKey, model, 'vulnerability-detection', file.filePath);
+        const parsed = parseResponse(rawResponse);
         vulnerabilities.push(...mapFindings(parsed.vulnerabilities ?? [], file));
     }
 
@@ -51,7 +57,12 @@ export async function detectVulnerabilitiesInCurrentFile(
     document: vscode.TextDocument
 ): Promise<Vulnerability[]> {
     const file = createScanFile(workspaceRoot, document);
-    const parsed = await callDistilBertDetection(getDistilBertEndpoint(), file.filePath, file.content);
+    const allFiles = await collectFiles(workspaceRoot);
+    const files = mergeScanFiles(file, allFiles);
+    const neighbors = pickNeighborFiles(file, files);
+    const prompt = buildPrompt(file, neighbors);
+    const rawResponse = await callAI(prompt, 'openai', getApiKey(), getModel(), 'vulnerability-detection', file.filePath);
+    const parsed = parseResponse(rawResponse);
     const vulnerabilities = mapFindings(parsed.vulnerabilities ?? [], file);
 
     saveDetectionSnapshot(workspaceRoot, vulnerabilities);
@@ -71,7 +82,9 @@ export async function detectVulnerabilitiesInSelection(
         return [];
     }
 
-    const parsed = await callDistilBertDetection(getDistilBertEndpoint(), file.filePath, selectedSnippet);
+    const prompt = generateSelectionDetectionPrompt(file, selectedSnippet, selectedRange.start.line + 1);
+    const rawResponse = await callAI(prompt, 'openai', getApiKey(), getModel(), 'vulnerability-detection', file.filePath);
+    const parsed = parseResponse(rawResponse);
     const vulnerabilities = mapSelectionFindings(
         parsed.vulnerabilities ?? [],
         file,
@@ -86,7 +99,7 @@ export async function detectVulnerabilitiesInSelection(
 export function loadDetectionSnapshot(workspaceRoot: string): Vulnerability[] {
     const snapshotPath = getDetectionSnapshotPath(workspaceRoot);
     if (!fs.existsSync(snapshotPath)) {
-        throw new Error('No DistilBERT detection snapshot found. Run detection first.');
+        throw new Error('No OpenAI detection snapshot found. Run detection first.');
     }
 
     try {
@@ -94,7 +107,7 @@ export function loadDetectionSnapshot(workspaceRoot: string): Vulnerability[] {
         const parsed = JSON.parse(raw) as { vulnerabilities?: Vulnerability[] };
         return Array.isArray(parsed.vulnerabilities) ? parsed.vulnerabilities : [];
     } catch (error) {
-        throw new Error(`Failed to load DistilBERT detection snapshot: ${(error as Error).message}`);
+        throw new Error(`Failed to load OpenAI detection snapshot: ${(error as Error).message}`);
     }
 }
 
@@ -158,6 +171,10 @@ function createScanFile(workspaceRoot: string, document: vscode.TextDocument): S
         language: inferLanguage(filePath),
         content: document.getText()
     };
+}
+
+function mergeScanFiles(target: ScanFile, allFiles: ScanFile[]): ScanFile[] {
+    return [target, ...allFiles.filter(file => file.filePath !== target.filePath)];
 }
 
 function expandSelectionToWholeLines(document: vscode.TextDocument, selection: vscode.Selection): vscode.Range {
@@ -249,12 +266,38 @@ function resolveImport(sourcePath: string, importPath: string, allFiles: ScanFil
     return null;
 }
 
-function getDistilBertEndpoint(): string {
-    const config = vscode.workspace.getConfiguration('firstsec');
-    return config.get<string>('distilbertEndpoint', 'http://127.0.0.1:8000');
+function buildPrompt(file: ScanFile, neighbors: ScanFile[]): string {
+    return generateDetectionPrompt(file, neighbors);
 }
 
-function mapFindings(findings: DetectionFinding[], file: ScanFile): Vulnerability[] {
+function getApiKey(): string {
+    const config = vscode.workspace.getConfiguration('firstsec');
+    const apiKey = config.get<string>('openaiApiKey', '');
+    if (!apiKey) {
+        throw new Error('OpenAI API key is not set in firstsec.openaiApiKey.');
+    }
+    return apiKey;
+}
+
+function getModel(): string {
+    const config = vscode.workspace.getConfiguration('firstsec');
+    return config.get<string>('openaiModel', 'gpt-3.5-turbo');
+}
+
+function parseResponse(rawResponse: string): GeminiDetectionResponse {
+    const trimmed = rawResponse.trim()
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/\s*```$/i, '');
+
+    try {
+        return JSON.parse(trimmed) as GeminiDetectionResponse;
+    } catch (error) {
+        throw new Error(`OpenAI detection returned invalid JSON: ${(error as Error).message}`);
+    }
+}
+
+function mapFindings(findings: GeminiFinding[], file: ScanFile): Vulnerability[] {
     const lines = file.content.split(/\r?\n/);
     const vulnerabilities: Vulnerability[] = [];
 
@@ -285,7 +328,7 @@ function mapFindings(findings: DetectionFinding[], file: ScanFile): Vulnerabilit
 }
 
 function mapSelectionFindings(
-    findings: DetectionFinding[],
+    findings: GeminiFinding[],
     file: ScanFile,
     startLine: number,
     endLine: number

@@ -19,7 +19,6 @@ import { showCostReport, exportCostData, clearCostData } from './commands/costRe
 import { exportVulnerabilities } from './commands/exportVulnerabilities';
 import { showBatchOpportunityForVulnerability, showBatchOpportunities } from './commands/batchFix';
 import { detectBatchOpportunities } from './core/batchProcessor';
-import { startDistilBertService } from './core/distilbertServiceManager';
 import { FirstSecVulnerabilityProvider, SeverityTreeItem, VulnerabilityTreeItem } from './ui/FirstSecVulnerabilityProvider';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -32,17 +31,16 @@ export function activate(context: vscode.ExtensionContext) {
     async function runOpenAIScan() {
         const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
         if (!workspaceRoot) {
-            showError('Open a workspace folder before running DistilBERT detection.');
+            showError('Open a workspace folder before running OpenAI detection.');
             return;
         }
 
-        await startDistilBertService(context);
         setLastDetectionContext(workspaceRoot);
         const vulns = await detectVulnerabilitiesWithOpenAI(workspaceRoot);
         applyStoredStatuses(workspaceRoot, vulns);
 
         provider.setVulnerabilities(vulns);
-        showInfo(`Detected ${vulns.length} vulnerabilities with DistilBERT.`);
+        showInfo(`Detected ${vulns.length} vulnerabilities with OpenAI.`);
         resetAutoFixCount();
         setTotalVulns(vulns.length);
 
@@ -64,7 +62,7 @@ export function activate(context: vscode.ExtensionContext) {
         const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
         const editor = vscode.window.activeTextEditor;
         if (!workspaceRoot) {
-            showError('Open a workspace folder before running DistilBERT detection.');
+            showError('Open a workspace folder before running OpenAI detection.');
             return;
         }
         if (!editor) {
@@ -72,7 +70,6 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        await startDistilBertService(context);
         setLastDetectionContext(workspaceRoot);
         const vulns = await detectVulnerabilitiesInCurrentFile(workspaceRoot, editor.document);
         applyStoredStatuses(workspaceRoot, vulns);
@@ -86,7 +83,7 @@ export function activate(context: vscode.ExtensionContext) {
         const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
         const editor = vscode.window.activeTextEditor;
         if (!workspaceRoot) {
-            showError('Open a workspace folder before running DistilBERT detection.');
+            showError('Open a workspace folder before running OpenAI detection.');
             return;
         }
         if (!editor) {
@@ -98,7 +95,6 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        await startDistilBertService(context);
         setLastDetectionContext(workspaceRoot);
         const vulns = await detectVulnerabilitiesInSelection(workspaceRoot, editor.document, editor.selection);
         applyStoredStatuses(workspaceRoot, vulns);
@@ -121,35 +117,33 @@ export function activate(context: vscode.ExtensionContext) {
         }
     }
 
-    void startDistilBertService(context);
-
     context.subscriptions.push(
         vscode.commands.registerCommand('firstsec.loadScanReport', async () => {
             try {
                 await runOpenAIScan();
             } catch (e: any) {
-                showError('Failed to detect vulnerabilities with DistilBERT: ' + (e.message || e));
+                showError('Failed to detect vulnerabilities with OpenAI: ' + (e.message || e));
             }
         }),
         vscode.commands.registerCommand('firstsec.rescanWithOpenAI', async () => {
             try {
                 await runOpenAIScan();
             } catch (e: any) {
-                showError('Failed to rescan vulnerabilities with DistilBERT: ' + (e.message || e));
+                showError('Failed to rescan vulnerabilities with OpenAI: ' + (e.message || e));
             }
         }),
         vscode.commands.registerCommand('firstsec.scanCurrentFile', async () => {
             try {
                 await runCurrentFileScan();
             } catch (e: any) {
-                showError('Failed to scan the current file with DistilBERT: ' + (e.message || e));
+                showError('Failed to scan the current file with OpenAI: ' + (e.message || e));
             }
         }),
         vscode.commands.registerCommand('firstsec.scanCurrentSelection', async () => {
             try {
                 await runSelectionScan();
             } catch (e: any) {
-                showError('Failed to scan the current selection with DistilBERT: ' + (e.message || e));
+                showError('Failed to scan the current selection with OpenAI: ' + (e.message || e));
             }
         }),
         vscode.commands.registerCommand('firstsec.refreshVulnerabilities', async () => {

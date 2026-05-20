@@ -5168,8 +5168,8 @@ var init_batchProcessor = __esm({
 // node_modules/dotenv/lib/main.js
 var require_main = __commonJS({
   "node_modules/dotenv/lib/main.js"(exports2, module2) {
-    var fs7 = require("fs");
-    var path9 = require("path");
+    var fs6 = require("fs");
+    var path8 = require("path");
     var os2 = require("os");
     var crypto = require("crypto");
     var TIPS = [
@@ -5300,7 +5300,7 @@ var require_main = __commonJS({
       if (options && options.path && options.path.length > 0) {
         if (Array.isArray(options.path)) {
           for (const filepath of options.path) {
-            if (fs7.existsSync(filepath)) {
+            if (fs6.existsSync(filepath)) {
               possibleVaultPath = filepath.endsWith(".vault") ? filepath : `${filepath}.vault`;
             }
           }
@@ -5308,15 +5308,15 @@ var require_main = __commonJS({
           possibleVaultPath = options.path.endsWith(".vault") ? options.path : `${options.path}.vault`;
         }
       } else {
-        possibleVaultPath = path9.resolve(process.cwd(), ".env.vault");
+        possibleVaultPath = path8.resolve(process.cwd(), ".env.vault");
       }
-      if (fs7.existsSync(possibleVaultPath)) {
+      if (fs6.existsSync(possibleVaultPath)) {
         return possibleVaultPath;
       }
       return null;
     }
     function _resolveHome(envPath) {
-      return envPath[0] === "~" ? path9.join(os2.homedir(), envPath.slice(1)) : envPath;
+      return envPath[0] === "~" ? path8.join(os2.homedir(), envPath.slice(1)) : envPath;
     }
     function _configVault(options) {
       const debug = parseBoolean(process.env.DOTENV_CONFIG_DEBUG || options && options.debug);
@@ -5333,7 +5333,7 @@ var require_main = __commonJS({
       return { parsed };
     }
     function configDotenv(options) {
-      const dotenvPath = path9.resolve(process.cwd(), ".env");
+      const dotenvPath = path8.resolve(process.cwd(), ".env");
       let encoding = "utf8";
       let processEnv = process.env;
       if (options && options.processEnv != null) {
@@ -5361,13 +5361,13 @@ var require_main = __commonJS({
       }
       let lastError;
       const parsedAll = {};
-      for (const path10 of optionPaths) {
+      for (const path9 of optionPaths) {
         try {
-          const parsed = DotenvModule.parse(fs7.readFileSync(path10, { encoding }));
+          const parsed = DotenvModule.parse(fs6.readFileSync(path9, { encoding }));
           DotenvModule.populate(parsedAll, parsed, options);
         } catch (e2) {
           if (debug) {
-            _debug(`failed to load ${path10} ${e2.message}`);
+            _debug(`failed to load ${path9} ${e2.message}`);
           }
           lastError = e2;
         }
@@ -5380,7 +5380,7 @@ var require_main = __commonJS({
         const shortPaths = [];
         for (const filePath of optionPaths) {
           try {
-            const relative2 = path9.relative(process.cwd(), filePath);
+            const relative2 = path8.relative(process.cwd(), filePath);
             shortPaths.push(relative2);
           } catch (e2) {
             if (debug) {
@@ -5491,13 +5491,13 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode18 = __toESM(require("vscode"));
-var path8 = __toESM(require("path"));
+var vscode17 = __toESM(require("vscode"));
+var path7 = __toESM(require("path"));
 
 // src/core/detectWithAi.ts
-var vscode2 = __toESM(require("vscode"));
-var fs2 = __toESM(require("fs"));
-var path = __toESM(require("path"));
+var vscode3 = __toESM(require("vscode"));
+var fs3 = __toESM(require("fs"));
+var path2 = __toESM(require("path"));
 
 // node_modules/node-fetch/src/index.js
 var import_node_http2 = __toESM(require("node:http"), 1);
@@ -6780,628 +6780,10 @@ function fixResponseChunkedTransferBadEnding(request, errorCallback) {
   });
 }
 
-// src/api/distilbertApi.ts
-async function callDistilBertDetection(endpoint, filePath, code) {
-  const baseUrl = endpoint.replace(/\/+$/, "");
-  const detectUrl = baseUrl.endsWith("/detect") ? baseUrl : `${baseUrl}/detect`;
-  const response = await fetch(detectUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ filePath, code })
-  });
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`DistilBERT detection service error ${response.status}: ${errorText}`);
-  }
-  return await response.json();
-}
-
-// src/utils/protectedFiles.ts
-var vscode = __toESM(require("vscode"));
-function escapeRegex(value) {
-  return value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&");
-}
-function globToRegExp(pattern) {
-  const normalized = pattern.replace(/\\/g, "/");
-  const placeholder = "\0";
-  let regex = escapeRegex(normalized);
-  regex = regex.replace(/\*\*/g, placeholder);
-  regex = regex.replace(/\*/g, "[^/]*");
-  regex = regex.replace(new RegExp(placeholder, "g"), ".*");
-  return new RegExp(`^${regex}$`);
-}
-function getProtectedFilePatterns() {
-  const config2 = vscode.workspace.getConfiguration("firstsec");
-  return config2.get("protectedFiles", []);
-}
-function isProtectedFile(filePath) {
-  const normalizedPath = filePath.replace(/\\/g, "/");
-  const patterns = getProtectedFilePatterns();
-  return patterns.some((pattern) => globToRegExp(pattern).test(normalizedPath));
-}
-
-// src/core/detectWithAi.ts
-var DEFAULT_INCLUDE = "**/*.{java,py,c,cc,cpp,h,hpp}";
-var DEFAULT_EXCLUDE = "**/{node_modules,dist,out,build,target,.git,coverage,.next,.nuxt,vendor}/**";
-var MAX_FILES = 25;
-var MAX_FILE_SIZE = 2e4;
-var DETECTION_SNAPSHOT_FILE = ".distilbert-detection.json";
-async function detectVulnerabilitiesWithOpenAI(workspaceRoot) {
-  const endpoint = getDistilBertEndpoint();
-  const files = await collectFiles(workspaceRoot);
-  const vulnerabilities = [];
-  for (const file of files) {
-    const parsed = await callDistilBertDetection(endpoint, file.filePath, file.content);
-    vulnerabilities.push(...mapFindings(parsed.vulnerabilities ?? [], file));
-  }
-  saveDetectionSnapshot(workspaceRoot, vulnerabilities);
-  return vulnerabilities;
-}
-async function detectVulnerabilitiesInCurrentFile(workspaceRoot, document) {
-  const file = createScanFile(workspaceRoot, document);
-  const parsed = await callDistilBertDetection(getDistilBertEndpoint(), file.filePath, file.content);
-  const vulnerabilities = mapFindings(parsed.vulnerabilities ?? [], file);
-  saveDetectionSnapshot(workspaceRoot, vulnerabilities);
-  return vulnerabilities;
-}
-async function detectVulnerabilitiesInSelection(workspaceRoot, document, selection) {
-  const file = createScanFile(workspaceRoot, document);
-  const selectedRange = expandSelectionToWholeLines(document, selection);
-  const selectedSnippet = document.getText(selectedRange).trim();
-  if (!selectedSnippet) {
-    return [];
-  }
-  const parsed = await callDistilBertDetection(getDistilBertEndpoint(), file.filePath, selectedSnippet);
-  const vulnerabilities = mapSelectionFindings(
-    parsed.vulnerabilities ?? [],
-    file,
-    selectedRange.start.line,
-    selectedRange.end.line
-  );
-  saveDetectionSnapshot(workspaceRoot, vulnerabilities);
-  return vulnerabilities;
-}
-function loadDetectionSnapshot(workspaceRoot) {
-  const snapshotPath = getDetectionSnapshotPath(workspaceRoot);
-  if (!fs2.existsSync(snapshotPath)) {
-    throw new Error("No DistilBERT detection snapshot found. Run detection first.");
-  }
-  try {
-    const raw = fs2.readFileSync(snapshotPath, "utf-8");
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed.vulnerabilities) ? parsed.vulnerabilities : [];
-  } catch (error) {
-    throw new Error(`Failed to load DistilBERT detection snapshot: ${error.message}`);
-  }
-}
-async function collectFiles(workspaceRoot) {
-  const uris = await vscode2.workspace.findFiles(DEFAULT_INCLUDE, DEFAULT_EXCLUDE, MAX_FILES * 3);
-  const files = [];
-  for (const uri of uris) {
-    if (files.length >= MAX_FILES) {
-      break;
-    }
-    const stat2 = fs2.statSync(uri.fsPath);
-    if (!stat2.isFile() || stat2.size > MAX_FILE_SIZE) {
-      continue;
-    }
-    const filePath = normalizePath(path.relative(workspaceRoot, uri.fsPath));
-    if (!filePath || filePath.startsWith("..")) {
-      continue;
-    }
-    if (isProtectedFile(filePath)) {
-      continue;
-    }
-    const content = fs2.readFileSync(uri.fsPath, "utf-8");
-    files.push({
-      filePath,
-      absolutePath: uri.fsPath,
-      language: inferLanguage(filePath),
-      content
-    });
-  }
-  return files;
-}
-function createScanFile(workspaceRoot, document) {
-  if (document.isUntitled) {
-    throw new Error("Save the file before running a security scan.");
-  }
-  const stat2 = fs2.statSync(document.uri.fsPath);
-  if (!stat2.isFile() || stat2.size > MAX_FILE_SIZE) {
-    throw new Error(`File is too large to scan. Limit is ${MAX_FILE_SIZE} bytes.`);
-  }
-  const filePath = normalizePath(path.relative(workspaceRoot, document.uri.fsPath));
-  if (!filePath || filePath.startsWith("..")) {
-    throw new Error("The active file must be inside the current workspace.");
-  }
-  if (isProtectedFile(filePath)) {
-    throw new Error(`Protected file cannot be scanned with AI: ${filePath}`);
-  }
-  return {
-    filePath,
-    absolutePath: document.uri.fsPath,
-    language: inferLanguage(filePath),
-    content: document.getText()
-  };
-}
-function expandSelectionToWholeLines(document, selection) {
-  const startLine = selection.start.line;
-  const endLine = selection.end.character === 0 && !selection.isSingleLine ? Math.max(selection.end.line - 1, selection.start.line) : selection.end.line;
-  return new vscode2.Range(
-    startLine,
-    0,
-    endLine,
-    document.lineAt(endLine).range.end.character
-  );
-}
-function getDistilBertEndpoint() {
-  const config2 = vscode2.workspace.getConfiguration("firstsec");
-  return config2.get("distilbertEndpoint", "http://127.0.0.1:8000");
-}
-function mapFindings(findings, file) {
-  const lines = file.content.split(/\r?\n/);
-  const vulnerabilities = [];
-  for (const finding of findings) {
-    const category = asString(finding.category);
-    const abstract = asString(finding.abstract);
-    const snippet = asString(finding.codeSnippet);
-    const line = resolveFindingLine(lines, snippet, finding.line);
-    if (!category || !abstract || !line) {
-      continue;
-    }
-    vulnerabilities.push({
-      category,
-      filePath: file.filePath,
-      line,
-      severity: normalizeSeverity(finding.severity),
-      language: file.language,
-      codeSnippet: asString(finding.codeSnippet) ?? lines[line - 1] ?? "",
-      abstract,
-      fullFileContent: file.content,
-      status: "open"
-    });
-  }
-  return vulnerabilities;
-}
-function mapSelectionFindings(findings, file, startLine, endLine) {
-  const lines = file.content.split(/\r?\n/);
-  const vulnerabilities = [];
-  for (const finding of findings) {
-    const category = asString(finding.category);
-    const abstract = asString(finding.abstract);
-    const snippet = asString(finding.codeSnippet);
-    const absoluteLine = resolveSelectionFindingLine(lines, snippet, finding.line, startLine, endLine);
-    if (!category || !abstract || !absoluteLine) {
-      continue;
-    }
-    vulnerabilities.push({
-      category,
-      filePath: file.filePath,
-      line: absoluteLine,
-      severity: normalizeSeverity(finding.severity),
-      language: file.language,
-      codeSnippet: snippet ?? lines[absoluteLine - 1] ?? "",
-      abstract,
-      fullFileContent: file.content,
-      status: "open"
-    });
-  }
-  return vulnerabilities;
-}
-function normalizeSeverity(value) {
-  switch (String(value ?? "").trim().toLowerCase()) {
-    case "critical":
-      return "Critical";
-    case "high":
-      return "High";
-    case "medium":
-      return "Medium";
-    case "low":
-      return "Low";
-    default:
-      return "Medium";
-  }
-}
-function resolveFindingLine(lines, snippet, aiLine) {
-  if (snippet) {
-    const snippetLine = findSnippetLine(lines, snippet);
-    if (snippetLine) {
-      return snippetLine;
-    }
-  }
-  return toLineNumber(aiLine, lines.length);
-}
-function resolveSelectionFindingLine(lines, snippet, aiLine, startLine, endLine) {
-  if (snippet) {
-    const snippetLine = findSnippetLine(lines, snippet, startLine, endLine);
-    if (snippetLine) {
-      return snippetLine;
-    }
-  }
-  const relativeLine = toLineNumber(aiLine, endLine - startLine + 1);
-  return relativeLine ? Math.min(startLine + relativeLine, lines.length) : null;
-}
-function findSnippetLine(lines, snippet, startIndex = 0, endIndex = lines.length - 1) {
-  const needle = snippet.trim();
-  if (!needle) {
-    return null;
-  }
-  const normalizedNeedle = normalizeForLineMatch(needle);
-  for (let i2 = startIndex; i2 <= endIndex && i2 < lines.length; i2++) {
-    if (lines[i2].includes(needle) || normalizeForLineMatch(lines[i2]).includes(normalizedNeedle)) {
-      return i2 + 1;
-    }
-  }
-  const snippetLines = needle.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  for (const snippetLine of snippetLines) {
-    const normalizedSnippetLine = normalizeForLineMatch(snippetLine);
-    for (let i2 = startIndex; i2 <= endIndex && i2 < lines.length; i2++) {
-      const normalizedLine = normalizeForLineMatch(lines[i2]);
-      if (lines[i2].includes(snippetLine) || normalizedLine.includes(normalizedSnippetLine)) {
-        return i2 + 1;
-      }
-    }
-  }
-  return null;
-}
-function normalizeForLineMatch(value) {
-  return value.replace(/\\"/g, '"').replace(/\\'/g, "'").replace(/\s+/g, " ").trim();
-}
-function toLineNumber(value, maxLine) {
-  const line = typeof value === "number" ? value : Number(value);
-  if (!Number.isInteger(line) || line < 1) {
-    return null;
-  }
-  return Math.min(line, maxLine);
-}
-function asString(value) {
-  if (typeof value !== "string") {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-}
-function inferLanguage(filePath) {
-  const extension = path.extname(filePath).replace(/^\./, "").toLowerCase();
-  return extension || "plaintext";
-}
-function normalizePath(filePath) {
-  return filePath.replace(/\\/g, "/");
-}
-function saveDetectionSnapshot(workspaceRoot, vulnerabilities) {
-  const snapshotPath = getDetectionSnapshotPath(workspaceRoot);
-  fs2.writeFileSync(snapshotPath, JSON.stringify({ vulnerabilities }, null, 2), "utf-8");
-}
-function getDetectionSnapshotPath(workspaceRoot) {
-  return path.join(workspaceRoot, DETECTION_SNAPSHOT_FILE);
-}
-
-// src/utils/errorHandler.ts
-var vscode3 = __toESM(require("vscode"));
-function showError(message, error) {
-  if (error) {
-    console.error(message, error);
-  }
-  vscode3.window.showErrorMessage(message);
-}
-function showInfo(message) {
-  vscode3.window.showInformationMessage(message);
-}
-function showWarning(message) {
-  vscode3.window.showWarningMessage(message);
-}
-function handleGeminiError(error) {
-  const errorMsg = error.message || String(error);
-  if (errorMsg.includes("429")) {
-    showError("Gemini API quota exceeded. Please wait a while, reduce usage, or upgrade your plan to continue using AI-powered fixes.");
-  } else {
-    showError("Gemini API error: " + errorMsg, error);
-  }
-}
-function handleOpenAIError(error) {
-  const errorMsg = error.message || String(error);
-  if (errorMsg.includes("429")) {
-    showError("OpenAI API quota exceeded. Please wait, reduce usage, or check your OpenAI plan.");
-  } else if (errorMsg.includes("401")) {
-    showError("OpenAI API authentication failed. Please check your API key.");
-  } else {
-    showError("OpenAI API error: " + errorMsg, error);
-  }
-}
-function handleClaudeError(error) {
-  const errorMsg = error.message || String(error);
-  if (errorMsg.includes("429")) {
-    showError("Claude API quota exceeded. Please wait, reduce usage, or check your Anthropic plan.");
-  } else if (errorMsg.includes("401")) {
-    showError("Claude API authentication failed. Please check your API key.");
-  } else {
-    showError("Claude API error: " + errorMsg, error);
-  }
-}
-
-// src/core/statusStore.ts
-var fs3 = __toESM(require("fs"));
-var path2 = __toESM(require("path"));
-var STATUS_FILE = ".firstsec-status.json";
-function getStatusFilePath(workspaceRoot) {
-  return path2.join(workspaceRoot, STATUS_FILE);
-}
-function getVulnerabilityStatusKey(vuln) {
-  return `${vuln.filePath}:${vuln.line}:${vuln.category}:${vuln.abstract}`;
-}
-function getLegacyVulnerabilityStatusKey(vuln) {
-  return `${vuln.filePath}:${vuln.line}`;
-}
-function saveStatuses(vulns, workspaceRoot) {
-  const statusMap = {};
-  for (const v of vulns) {
-    statusMap[getVulnerabilityStatusKey(v)] = v.status;
-  }
-  fs3.writeFileSync(getStatusFilePath(workspaceRoot), JSON.stringify(statusMap, null, 2), "utf-8");
-}
-function loadStatuses(workspaceRoot) {
-  const filePath = getStatusFilePath(workspaceRoot);
-  if (!fs3.existsSync(filePath)) return {};
-  try {
-    const raw = fs3.readFileSync(filePath, "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
-}
-
-// src/utils/securityUtils.ts
-var path3 = __toESM(require("path"));
-var SENSITIVE_FILE_PATTERNS = [
-  // Configuration files
-  /\.env$/i,
-  /\.env\./i,
-  /config\./i,
-  /\.config\./i,
-  /\.properties$/i,
-  /\.yml$/i,
-  /\.yaml$/i,
-  /\.json$/i,
-  /\.xml$/i,
-  /\.toml$/i,
-  /\.ini$/i,
-  /\.cfg$/i,
-  /\.conf$/i,
-  // Security and authentication files
-  /\.pem$/i,
-  /\.key$/i,
-  /\.crt$/i,
-  /\.p12$/i,
-  /\.pfx$/i,
-  /\.keystore$/i,
-  /\.jks$/i,
-  /\.truststore$/i,
-  // Database files
-  /\.db$/i,
-  /\.sqlite$/i,
-  /\.sql$/i,
-  // Log files
-  /\.log$/i,
-  /\.logs$/i,
-  // Backup files
-  /\.bak$/i,
-  /\.backup$/i,
-  /\.old$/i,
-  // Lock files
-  /\.lock$/i,
-  /\.pid$/i,
-  // Git and version control
-  /\.gitignore$/i,
-  /\.gitattributes$/i,
-  /\.git$/i,
-  // Package managers
-  /package\.json$/i,
-  /package-lock\.json$/i,
-  /yarn\.lock$/i,
-  /pom\.xml$/i,
-  /build\.gradle$/i,
-  /gradle\.properties$/i,
-  /requirements\.txt$/i,
-  /Gemfile$/i,
-  /Gemfile\.lock$/i,
-  /Cargo\.toml$/i,
-  /Cargo\.lock$/i,
-  // IDE and editor files
-  /\.vscode\//i,
-  /\.idea\//i,
-  /\.eclipse$/i,
-  /\.project$/i,
-  /\.classpath$/i,
-  /\.settings\//i,
-  // Build and deployment
-  /Dockerfile$/i,
-  /docker-compose\./i,
-  /\.dockerignore$/i,
-  /Jenkinsfile$/i,
-  /\.travis\.yml$/i,
-  /\.github\//i,
-  /\.gitlab-ci\.yml$/i,
-  // Documentation
-  /README\./i,
-  /CHANGELOG\./i,
-  /LICENSE$/i,
-  /\.md$/i,
-  // System files
-  /\.DS_Store$/i,
-  /Thumbs\.db$/i,
-  /desktop\.ini$/i
-];
-var CRITICAL_FILE_PATTERNS = [
-  /\.env$/i,
-  /\.env\./i,
-  /\.pem$/i,
-  /\.key$/i,
-  /\.crt$/i,
-  /\.p12$/i,
-  /\.pfx$/i,
-  /\.keystore$/i,
-  /\.jks$/i,
-  /\.truststore$/i,
-  /\.git\//i,
-  /package\.json$/i,
-  /pom\.xml$/i,
-  /build\.gradle$/i,
-  /Dockerfile$/i,
-  /docker-compose\./i
-];
-function checkFileSecurity(filePath) {
-  const fileName = path3.basename(filePath);
-  const normalizedPath = filePath.replace(/\\/g, "/").toLowerCase();
-  const isCritical = CRITICAL_FILE_PATTERNS.some((pattern) => pattern.test(normalizedPath));
-  if (isCritical) {
-    return {
-      isSensitive: true,
-      isCritical: true,
-      warningMessage: `\u26A0\uFE0F CRITICAL SECURITY WARNING: ${fileName} contains sensitive configuration, credentials, or system files that should NEVER be modified by AI.`,
-      allowModification: false
-    };
-  }
-  const isSensitive = SENSITIVE_FILE_PATTERNS.some((pattern) => pattern.test(normalizedPath));
-  if (isSensitive) {
-    return {
-      isSensitive: true,
-      isCritical: false,
-      warningMessage: `\u26A0\uFE0F SECURITY WARNING: ${fileName} appears to be a configuration, security, or system file. Modifying it may affect your application's behavior or security.`,
-      allowModification: true
-      // Allow but with warning
-    };
-  }
-  return {
-    isSensitive: false,
-    isCritical: false,
-    allowModification: true
-  };
-}
-function getSensitiveFilesInFix(filePaths) {
-  return filePaths.map((filePath) => checkFileSecurity(filePath));
-}
-function hasCriticalFiles(filePaths) {
-  return filePaths.some((filePath) => checkFileSecurity(filePath).isCritical);
-}
-function getSecuritySummary(filePaths) {
-  const results = getSensitiveFilesInFix(filePaths);
-  const criticalFiles = results.filter((r2) => r2.isCritical).map((r2) => path3.basename(r2.warningMessage?.split(": ")[1] || ""));
-  const sensitiveFiles = results.filter((r2) => r2.isSensitive && !r2.isCritical).map((r2) => path3.basename(r2.warningMessage?.split(": ")[1] || ""));
-  let summary = "";
-  if (criticalFiles.length > 0) {
-    summary += `\u{1F6A8} CRITICAL FILES (BLOCKED): ${criticalFiles.join(", ")}
-`;
-  }
-  if (sensitiveFiles.length > 0) {
-    summary += `\u26A0\uFE0F SENSITIVE FILES: ${sensitiveFiles.join(", ")}
-`;
-  }
-  return summary;
-}
-
-// src/commands/batchFix.ts
-var vscode7 = __toESM(require("vscode"));
-init_batchProcessor();
-
-// src/prompts/batchPrompt.ts
-function generateBatchPrompt(batchGroup) {
-  const { filePath, vulnType, vulnerabilities } = batchGroup;
-  const findings = vulnerabilities.map((v) => `Line ${v.line}: ${v.codeSnippet}`).join("\n\n");
-  return `
-Fix the selected security vulnerabilities in this file.
-
-Before writing any code, determine internally:
-1. the shared vulnerability type or pattern,
-2. the vulnerable sinks or unsafe APIs,
-3. the untrusted inputs or sources that reach them, if any,
-4. the secure remediation pattern that should be applied consistently,
-5. the smallest set of code changes needed to fix all listed findings without changing business logic.
-
-Then apply the fix using one consistent secure coding approach across all listed findings.
-
-TARGET FILE
-File: ${filePath}
-Vulnerability Type: ${vulnType}
-Count: ${vulnerabilities.length}
-
-VULNERABLE CODE
-${findings}
-
-Important rules:
-- Fix only the listed vulnerabilities.
-- Fix the actual vulnerable sinks, not unrelated code.
-- Change only the code that is necessary for the fix.
-- Do not modify a different function by mistake.
-- Do not delete any function.
-- Do not delete business logic.
-- Do not replace real logic with an empty body, placeholder, null, or a trivial return.
-- Do not rewrite the whole file unless absolutely necessary.
-- Do not add dead code or commented-out code.
-- Do not add unused variables, unused methods, or unused imports.
-- Do not suppress or hide the findings with comments.
-- Do not replace one unsafe pattern with another unsafe pattern.
-- Use the standard safe library, validation, encoding, parameterization, or authorization pattern normally used for this vulnerability type.
-- Preserve the original business behavior.
-- Return compilable code only.
-- Prefer fixing the smallest relevant methods or statements instead of rewriting the full file.
-- Apply one consistent fix pattern to the listed vulnerabilities.
-- Prefer a same-file fix if it is secure and sufficient.
-- If another file is absolutely necessary, include it. Otherwise do not touch any other file.
-
-Bad fixes include:
-- deleting a vulnerable method
-- replacing a method body with return, return null, return [], or a constant
-- removing unrelated business logic
-- rewriting the full class when only a few methods need a fix
-
-OUTPUT RULES
-- Return code only.
-- Do not include explanations.
-- Do not include notes.
-- Do not include markdown text except file headers.
-- The first file must be exactly this file: ${filePath}
-
-OUTPUT FORMAT
-
-# ${filePath}
-\`\`\`${getFileExtension(filePath)}
-[fixed code]
-\`\`\`
-
-If another file is absolutely required, add:
-
-# relative/path/to/OtherFile.ext
-\`\`\`
-[fixed code]
-\`\`\`
-
-FINAL CHECK BEFORE ANSWERING
-- Did you fix the actual vulnerable sinks?
-- Did you fix only the listed vulnerabilities?
-- Did you keep the original logic?
-- Did you avoid deleting code?
-- Did you avoid replacing code with a trivial return?
-- Did you avoid rewriting the whole file?
-`;
-}
-function getFileExtension(filePath) {
-  const ext = filePath.split(".").pop()?.toLowerCase();
-  const extensionMap = {
-    java: "java",
-    py: "python",
-    cpp: "cpp",
-    c: "c",
-    cc: "cpp",
-    h: "c",
-    hpp: "cpp"
-  };
-  return extensionMap[ext || ""] || "text";
-}
-
 // src/utils/costTracker.ts
-var vscode4 = __toESM(require("vscode"));
-var fs4 = __toESM(require("fs"));
-var path4 = __toESM(require("path"));
+var vscode = __toESM(require("vscode"));
+var fs2 = __toESM(require("fs"));
+var path = __toESM(require("path"));
 var COST_PER_1K_TOKENS = {
   gemini: {
     "gemini-1.5-flash-002": 0.075,
@@ -7433,16 +6815,16 @@ var CostTracker = class {
     this.loadCostData();
   }
   getCostDataPath() {
-    const workspaceRoot = vscode4.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!workspaceRoot) {
-      return path4.join(process.cwd(), ".firstsec-costs.json");
+      return path.join(process.cwd(), ".firstsec-costs.json");
     }
-    return path4.join(workspaceRoot, ".firstsec-costs.json");
+    return path.join(workspaceRoot, ".firstsec-costs.json");
   }
   loadCostData() {
     try {
-      if (fs4.existsSync(this.costDataPath)) {
-        const data = fs4.readFileSync(this.costDataPath, "utf-8");
+      if (fs2.existsSync(this.costDataPath)) {
+        const data = fs2.readFileSync(this.costDataPath, "utf-8");
         this.costData = JSON.parse(data);
       }
     } catch (error) {
@@ -7452,11 +6834,11 @@ var CostTracker = class {
   }
   saveCostData() {
     try {
-      const dir = path4.dirname(this.costDataPath);
-      if (!fs4.existsSync(dir)) {
-        fs4.mkdirSync(dir, { recursive: true });
+      const dir = path.dirname(this.costDataPath);
+      if (!fs2.existsSync(dir)) {
+        fs2.mkdirSync(dir, { recursive: true });
       }
-      fs4.writeFileSync(this.costDataPath, JSON.stringify(this.costData, null, 2));
+      fs2.writeFileSync(this.costDataPath, JSON.stringify(this.costData, null, 2));
     } catch (error) {
       console.error("Failed to save cost data:", error);
     }
@@ -7484,7 +6866,7 @@ var CostTracker = class {
     this.costData.push(entry);
     this.saveCostData();
     if (cost > 1) {
-      vscode4.window.showWarningMessage(
+      vscode.window.showWarningMessage(
         `\u26A0\uFE0F Expensive API call: $${cost.toFixed(2)} for ${operation}`
       );
     }
@@ -7690,6 +7072,854 @@ async function callAI(prompt, provider, apiKey, model, operation = "auto-fix", f
   } else {
     throw new Error("Unknown AI provider: " + provider);
   }
+}
+
+// src/prompts/detectPrompt.ts
+function generateDetectionPrompt(primaryFile, neighborFiles) {
+  const neighborSection = neighborFiles.length > 0 ? neighborFiles.map((file) => formatFileBlock(file)).join("\n\n") : "No neighbor files provided.";
+  return `
+You are a senior application security reviewer.
+
+Your task is to detect real security vulnerabilities in the PRIMARY_FILE.
+You are also given NEIGHBOR_FILES as supporting context only.
+
+Scanning strategy:
+- Focus on the PRIMARY_FILE first.
+- Use NEIGHBOR_FILES to understand data flow, trust boundaries, validation, authorization, persistence, and dangerous sinks.
+- This is a file-plus-neighbor-context review, not a whole-project review.
+
+Neighbor context may include:
+- controller + service
+- service + repository
+- class + interface
+- file + imported local modules
+
+Important rules:
+- Only report vulnerabilities that exist in the PRIMARY_FILE.
+- Do not report findings that belong only to a neighbor file.
+- You may use neighbor files to justify why code in the PRIMARY_FILE is vulnerable.
+- Prefer high-confidence findings over speculative ones.
+- If something is uncertain, do not report it.
+- Do not return prose, markdown, explanations, or code fences.
+- Return strict JSON only.
+
+Return exactly this JSON schema:
+{
+  "vulnerabilities": [
+    {
+      "category": "string",
+      "filePath": "string",
+      "line": 1,
+      "severity": "Critical|High|Medium|Low",
+      "abstract": "string",
+      "codeSnippet": "string"
+    }
+  ]
+}
+
+Output rules:
+- filePath must always be the PRIMARY_FILE path exactly as provided.
+- line must be a line number in the PRIMARY_FILE.
+- category must be a stable vulnerability type label such as:
+  "SQL Injection", "Command Injection", "Path Traversal", "Broken Access Control", "XXE", "SSRF", "Insecure Deserialization", "Hardcoded Secret", "Weak Cryptography", "XSS", "CSRF", "Authentication Bypass"
+- abstract must be concise and specific:
+  explain why the PRIMARY_FILE is vulnerable, optionally referencing neighbor context
+- codeSnippet must be the smallest relevant snippet from the PRIMARY_FILE
+- If there are no real vulnerabilities, return:
+  {"vulnerabilities":[]}
+
+Review guidance:
+Look for issues such as:
+- untrusted input reaching database queries, command execution, file access, template rendering, redirects, HTTP calls, or deserialization
+- missing or broken authorization checks
+- authentication flaws
+- unsafe file handling
+- insecure crypto usage
+- secret exposure
+- unsafe external requests
+- validation/sanitization gaps
+- dangerous framework misuses
+- trust boundary violations across controller/service/repository flow
+
+PRIMARY_FILE:
+Path: ${primaryFile.filePath}
+Language: ${primaryFile.language}
+Code:
+${primaryFile.content}
+
+NEIGHBOR_FILES:
+${neighborSection}
+`.trim();
+}
+function generateSelectionDetectionPrompt(primaryFile, selectedSnippet, selectionStartLine) {
+  return `
+You are a senior application security reviewer.
+
+Your task is to detect real security vulnerabilities in the PRIMARY_SELECTION.
+You are also given the FULL_FILE as supporting context.
+
+Scanning strategy:
+- Focus on the PRIMARY_SELECTION first.
+- Use FULL_FILE to understand surrounding validation, authorization, data flow, and dangerous sinks.
+- This is a selection-focused review, not a whole-project review.
+
+Important rules:
+- Only report vulnerabilities that exist in the PRIMARY_SELECTION.
+- Do not report findings that belong only to other parts of the file.
+- Prefer high-confidence findings over speculative ones.
+- If something is uncertain, do not report it.
+- Do not return prose, markdown, explanations, or code fences.
+- Return strict JSON only.
+
+Return exactly this JSON schema:
+{
+  "vulnerabilities": [
+    {
+      "category": "string",
+      "filePath": "string",
+      "line": 1,
+      "severity": "Critical|High|Medium|Low",
+      "abstract": "string",
+      "codeSnippet": "string"
+    }
+  ]
+}
+
+Output rules:
+- filePath must always be the PRIMARY_FILE path exactly as provided.
+- line must be a line number inside the PRIMARY_SELECTION, where line 1 is the first selected line.
+- category must be a stable vulnerability type label.
+- abstract must be concise and specific.
+- codeSnippet must be the smallest relevant snippet from the PRIMARY_SELECTION.
+- If there are no real vulnerabilities, return:
+  {"vulnerabilities":[]}
+
+PRIMARY_FILE:
+Path: ${primaryFile.filePath}
+Language: ${primaryFile.language}
+
+PRIMARY_SELECTION:
+Starts at line: ${selectionStartLine}
+Code:
+${selectedSnippet}
+
+FULL_FILE:
+Path: ${primaryFile.filePath}
+Language: ${primaryFile.language}
+Code:
+${primaryFile.content}
+`.trim();
+}
+function formatFileBlock(file) {
+  return [
+    `- Path: ${file.filePath}`,
+    `  Language: ${file.language}`,
+    "  Code:",
+    indentBlock(file.content, "  ")
+  ].join("\n");
+}
+function indentBlock(value, prefix) {
+  return value.split(/\r?\n/).map((line) => `${prefix}${line}`).join("\n");
+}
+
+// src/utils/protectedFiles.ts
+var vscode2 = __toESM(require("vscode"));
+function escapeRegex(value) {
+  return value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&");
+}
+function globToRegExp(pattern) {
+  const normalized = pattern.replace(/\\/g, "/");
+  const placeholder = "\0";
+  let regex = escapeRegex(normalized);
+  regex = regex.replace(/\*\*/g, placeholder);
+  regex = regex.replace(/\*/g, "[^/]*");
+  regex = regex.replace(new RegExp(placeholder, "g"), ".*");
+  return new RegExp(`^${regex}$`);
+}
+function getProtectedFilePatterns() {
+  const config2 = vscode2.workspace.getConfiguration("firstsec");
+  return config2.get("protectedFiles", []);
+}
+function isProtectedFile(filePath) {
+  const normalizedPath = filePath.replace(/\\/g, "/");
+  const patterns = getProtectedFilePatterns();
+  return patterns.some((pattern) => globToRegExp(pattern).test(normalizedPath));
+}
+
+// src/core/detectWithAi.ts
+var DEFAULT_INCLUDE = "**/*.{java,py,c,cc,cpp,h,hpp}";
+var DEFAULT_EXCLUDE = "**/{node_modules,dist,out,build,target,.git,coverage,.next,.nuxt,vendor}/**";
+var MAX_FILES = 25;
+var MAX_FILE_SIZE = 2e4;
+var MAX_NEIGHBORS = 3;
+var DETECTION_SNAPSHOT_FILE = ".openai-detection.json";
+async function detectVulnerabilitiesWithOpenAI(workspaceRoot) {
+  const apiKey = getApiKey();
+  const model = getModel();
+  const files = await collectFiles(workspaceRoot);
+  const vulnerabilities = [];
+  for (const file of files) {
+    const neighbors = pickNeighborFiles(file, files);
+    const prompt = buildPrompt(file, neighbors);
+    const rawResponse = await callAI(prompt, "openai", apiKey, model, "vulnerability-detection", file.filePath);
+    const parsed = parseResponse(rawResponse);
+    vulnerabilities.push(...mapFindings(parsed.vulnerabilities ?? [], file));
+  }
+  saveDetectionSnapshot(workspaceRoot, vulnerabilities);
+  return vulnerabilities;
+}
+async function detectVulnerabilitiesInCurrentFile(workspaceRoot, document) {
+  const file = createScanFile(workspaceRoot, document);
+  const allFiles = await collectFiles(workspaceRoot);
+  const files = mergeScanFiles(file, allFiles);
+  const neighbors = pickNeighborFiles(file, files);
+  const prompt = buildPrompt(file, neighbors);
+  const rawResponse = await callAI(prompt, "openai", getApiKey(), getModel(), "vulnerability-detection", file.filePath);
+  const parsed = parseResponse(rawResponse);
+  const vulnerabilities = mapFindings(parsed.vulnerabilities ?? [], file);
+  saveDetectionSnapshot(workspaceRoot, vulnerabilities);
+  return vulnerabilities;
+}
+async function detectVulnerabilitiesInSelection(workspaceRoot, document, selection) {
+  const file = createScanFile(workspaceRoot, document);
+  const selectedRange = expandSelectionToWholeLines(document, selection);
+  const selectedSnippet = document.getText(selectedRange).trim();
+  if (!selectedSnippet) {
+    return [];
+  }
+  const prompt = generateSelectionDetectionPrompt(file, selectedSnippet, selectedRange.start.line + 1);
+  const rawResponse = await callAI(prompt, "openai", getApiKey(), getModel(), "vulnerability-detection", file.filePath);
+  const parsed = parseResponse(rawResponse);
+  const vulnerabilities = mapSelectionFindings(
+    parsed.vulnerabilities ?? [],
+    file,
+    selectedRange.start.line,
+    selectedRange.end.line
+  );
+  saveDetectionSnapshot(workspaceRoot, vulnerabilities);
+  return vulnerabilities;
+}
+function loadDetectionSnapshot(workspaceRoot) {
+  const snapshotPath = getDetectionSnapshotPath(workspaceRoot);
+  if (!fs3.existsSync(snapshotPath)) {
+    throw new Error("No OpenAI detection snapshot found. Run detection first.");
+  }
+  try {
+    const raw = fs3.readFileSync(snapshotPath, "utf-8");
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed.vulnerabilities) ? parsed.vulnerabilities : [];
+  } catch (error) {
+    throw new Error(`Failed to load OpenAI detection snapshot: ${error.message}`);
+  }
+}
+async function collectFiles(workspaceRoot) {
+  const uris = await vscode3.workspace.findFiles(DEFAULT_INCLUDE, DEFAULT_EXCLUDE, MAX_FILES * 3);
+  const files = [];
+  for (const uri of uris) {
+    if (files.length >= MAX_FILES) {
+      break;
+    }
+    const stat2 = fs3.statSync(uri.fsPath);
+    if (!stat2.isFile() || stat2.size > MAX_FILE_SIZE) {
+      continue;
+    }
+    const filePath = normalizePath(path2.relative(workspaceRoot, uri.fsPath));
+    if (!filePath || filePath.startsWith("..")) {
+      continue;
+    }
+    if (isProtectedFile(filePath)) {
+      continue;
+    }
+    const content = fs3.readFileSync(uri.fsPath, "utf-8");
+    files.push({
+      filePath,
+      absolutePath: uri.fsPath,
+      language: inferLanguage(filePath),
+      content
+    });
+  }
+  return files;
+}
+function createScanFile(workspaceRoot, document) {
+  if (document.isUntitled) {
+    throw new Error("Save the file before running a security scan.");
+  }
+  const stat2 = fs3.statSync(document.uri.fsPath);
+  if (!stat2.isFile() || stat2.size > MAX_FILE_SIZE) {
+    throw new Error(`File is too large to scan. Limit is ${MAX_FILE_SIZE} bytes.`);
+  }
+  const filePath = normalizePath(path2.relative(workspaceRoot, document.uri.fsPath));
+  if (!filePath || filePath.startsWith("..")) {
+    throw new Error("The active file must be inside the current workspace.");
+  }
+  if (isProtectedFile(filePath)) {
+    throw new Error(`Protected file cannot be scanned with AI: ${filePath}`);
+  }
+  return {
+    filePath,
+    absolutePath: document.uri.fsPath,
+    language: inferLanguage(filePath),
+    content: document.getText()
+  };
+}
+function mergeScanFiles(target, allFiles) {
+  return [target, ...allFiles.filter((file) => file.filePath !== target.filePath)];
+}
+function expandSelectionToWholeLines(document, selection) {
+  const startLine = selection.start.line;
+  const endLine = selection.end.character === 0 && !selection.isSingleLine ? Math.max(selection.end.line - 1, selection.start.line) : selection.end.line;
+  return new vscode3.Range(
+    startLine,
+    0,
+    endLine,
+    document.lineAt(endLine).range.end.character
+  );
+}
+function pickNeighborFiles(target, allFiles) {
+  const selected = [];
+  const selectedPaths = /* @__PURE__ */ new Set();
+  const imports = extractLocalImports(target);
+  for (const importedPath of imports) {
+    const resolved = resolveImport(target.filePath, importedPath, allFiles);
+    if (resolved && !selectedPaths.has(resolved.filePath)) {
+      selected.push(resolved);
+      selectedPaths.add(resolved.filePath);
+    }
+    if (selected.length >= MAX_NEIGHBORS) {
+      return selected;
+    }
+  }
+  const targetDir = path2.posix.dirname(target.filePath);
+  for (const file of allFiles) {
+    if (file.filePath === target.filePath || path2.posix.dirname(file.filePath) !== targetDir) {
+      continue;
+    }
+    if (!selectedPaths.has(file.filePath)) {
+      selected.push(file);
+      selectedPaths.add(file.filePath);
+    }
+    if (selected.length >= MAX_NEIGHBORS) {
+      break;
+    }
+  }
+  return selected;
+}
+function extractLocalImports(file) {
+  const imports = /* @__PURE__ */ new Set();
+  const extension = path2.extname(file.filePath).toLowerCase();
+  if (extension === ".java") {
+    const regex = /import\s+([\w.]+)\s*;/g;
+    for (const match of file.content.matchAll(regex)) {
+      const imported = match[1];
+      if (imported) {
+        imports.add(`./${imported.split(".").pop() ?? ""}`);
+      }
+    }
+  }
+  return [...imports];
+}
+function resolveImport(sourcePath, importPath, allFiles) {
+  const sourceDir = path2.posix.dirname(sourcePath);
+  const base = normalizePath(path2.posix.normalize(path2.posix.join(sourceDir, importPath)));
+  const candidates = [
+    base,
+    `${base}.java`,
+    `${base}.py`,
+    `${base}.c`,
+    `${base}.cc`,
+    `${base}.cpp`,
+    `${base}.h`,
+    `${base}.hpp`
+  ];
+  for (const candidate of candidates) {
+    const match = allFiles.find((file) => file.filePath === candidate);
+    if (match) {
+      return match;
+    }
+  }
+  return null;
+}
+function buildPrompt(file, neighbors) {
+  return generateDetectionPrompt(file, neighbors);
+}
+function getApiKey() {
+  const config2 = vscode3.workspace.getConfiguration("firstsec");
+  const apiKey = config2.get("openaiApiKey", "");
+  if (!apiKey) {
+    throw new Error("OpenAI API key is not set in firstsec.openaiApiKey.");
+  }
+  return apiKey;
+}
+function getModel() {
+  const config2 = vscode3.workspace.getConfiguration("firstsec");
+  return config2.get("openaiModel", "gpt-3.5-turbo");
+}
+function parseResponse(rawResponse) {
+  const trimmed = rawResponse.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "");
+  try {
+    return JSON.parse(trimmed);
+  } catch (error) {
+    throw new Error(`OpenAI detection returned invalid JSON: ${error.message}`);
+  }
+}
+function mapFindings(findings, file) {
+  const lines = file.content.split(/\r?\n/);
+  const vulnerabilities = [];
+  for (const finding of findings) {
+    const category = asString(finding.category);
+    const abstract = asString(finding.abstract);
+    const snippet = asString(finding.codeSnippet);
+    const line = resolveFindingLine(lines, snippet, finding.line);
+    if (!category || !abstract || !line) {
+      continue;
+    }
+    vulnerabilities.push({
+      category,
+      filePath: file.filePath,
+      line,
+      severity: normalizeSeverity(finding.severity),
+      language: file.language,
+      codeSnippet: asString(finding.codeSnippet) ?? lines[line - 1] ?? "",
+      abstract,
+      fullFileContent: file.content,
+      status: "open"
+    });
+  }
+  return vulnerabilities;
+}
+function mapSelectionFindings(findings, file, startLine, endLine) {
+  const lines = file.content.split(/\r?\n/);
+  const vulnerabilities = [];
+  for (const finding of findings) {
+    const category = asString(finding.category);
+    const abstract = asString(finding.abstract);
+    const snippet = asString(finding.codeSnippet);
+    const absoluteLine = resolveSelectionFindingLine(lines, snippet, finding.line, startLine, endLine);
+    if (!category || !abstract || !absoluteLine) {
+      continue;
+    }
+    vulnerabilities.push({
+      category,
+      filePath: file.filePath,
+      line: absoluteLine,
+      severity: normalizeSeverity(finding.severity),
+      language: file.language,
+      codeSnippet: snippet ?? lines[absoluteLine - 1] ?? "",
+      abstract,
+      fullFileContent: file.content,
+      status: "open"
+    });
+  }
+  return vulnerabilities;
+}
+function normalizeSeverity(value) {
+  switch (String(value ?? "").trim().toLowerCase()) {
+    case "critical":
+      return "Critical";
+    case "high":
+      return "High";
+    case "medium":
+      return "Medium";
+    case "low":
+      return "Low";
+    default:
+      return "Medium";
+  }
+}
+function resolveFindingLine(lines, snippet, aiLine) {
+  if (snippet) {
+    const snippetLine = findSnippetLine(lines, snippet);
+    if (snippetLine) {
+      return snippetLine;
+    }
+  }
+  return toLineNumber(aiLine, lines.length);
+}
+function resolveSelectionFindingLine(lines, snippet, aiLine, startLine, endLine) {
+  if (snippet) {
+    const snippetLine = findSnippetLine(lines, snippet, startLine, endLine);
+    if (snippetLine) {
+      return snippetLine;
+    }
+  }
+  const relativeLine = toLineNumber(aiLine, endLine - startLine + 1);
+  return relativeLine ? Math.min(startLine + relativeLine, lines.length) : null;
+}
+function findSnippetLine(lines, snippet, startIndex = 0, endIndex = lines.length - 1) {
+  const needle = snippet.trim();
+  if (!needle) {
+    return null;
+  }
+  const normalizedNeedle = normalizeForLineMatch(needle);
+  for (let i2 = startIndex; i2 <= endIndex && i2 < lines.length; i2++) {
+    if (lines[i2].includes(needle) || normalizeForLineMatch(lines[i2]).includes(normalizedNeedle)) {
+      return i2 + 1;
+    }
+  }
+  const snippetLines = needle.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  for (const snippetLine of snippetLines) {
+    const normalizedSnippetLine = normalizeForLineMatch(snippetLine);
+    for (let i2 = startIndex; i2 <= endIndex && i2 < lines.length; i2++) {
+      const normalizedLine = normalizeForLineMatch(lines[i2]);
+      if (lines[i2].includes(snippetLine) || normalizedLine.includes(normalizedSnippetLine)) {
+        return i2 + 1;
+      }
+    }
+  }
+  return null;
+}
+function normalizeForLineMatch(value) {
+  return value.replace(/\\"/g, '"').replace(/\\'/g, "'").replace(/\s+/g, " ").trim();
+}
+function toLineNumber(value, maxLine) {
+  const line = typeof value === "number" ? value : Number(value);
+  if (!Number.isInteger(line) || line < 1) {
+    return null;
+  }
+  return Math.min(line, maxLine);
+}
+function asString(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+function inferLanguage(filePath) {
+  const extension = path2.extname(filePath).replace(/^\./, "").toLowerCase();
+  return extension || "plaintext";
+}
+function normalizePath(filePath) {
+  return filePath.replace(/\\/g, "/");
+}
+function saveDetectionSnapshot(workspaceRoot, vulnerabilities) {
+  const snapshotPath = getDetectionSnapshotPath(workspaceRoot);
+  fs3.writeFileSync(snapshotPath, JSON.stringify({ vulnerabilities }, null, 2), "utf-8");
+}
+function getDetectionSnapshotPath(workspaceRoot) {
+  return path2.join(workspaceRoot, DETECTION_SNAPSHOT_FILE);
+}
+
+// src/utils/errorHandler.ts
+var vscode4 = __toESM(require("vscode"));
+function showError(message, error) {
+  if (error) {
+    console.error(message, error);
+  }
+  vscode4.window.showErrorMessage(message);
+}
+function showInfo(message) {
+  vscode4.window.showInformationMessage(message);
+}
+function showWarning(message) {
+  vscode4.window.showWarningMessage(message);
+}
+function handleGeminiError(error) {
+  const errorMsg = error.message || String(error);
+  if (errorMsg.includes("429")) {
+    showError("Gemini API quota exceeded. Please wait a while, reduce usage, or upgrade your plan to continue using AI-powered fixes.");
+  } else {
+    showError("Gemini API error: " + errorMsg, error);
+  }
+}
+function handleOpenAIError(error) {
+  const errorMsg = error.message || String(error);
+  if (errorMsg.includes("429")) {
+    showError("OpenAI API quota exceeded. Please wait, reduce usage, or check your OpenAI plan.");
+  } else if (errorMsg.includes("401")) {
+    showError("OpenAI API authentication failed. Please check your API key.");
+  } else {
+    showError("OpenAI API error: " + errorMsg, error);
+  }
+}
+function handleClaudeError(error) {
+  const errorMsg = error.message || String(error);
+  if (errorMsg.includes("429")) {
+    showError("Claude API quota exceeded. Please wait, reduce usage, or check your Anthropic plan.");
+  } else if (errorMsg.includes("401")) {
+    showError("Claude API authentication failed. Please check your API key.");
+  } else {
+    showError("Claude API error: " + errorMsg, error);
+  }
+}
+
+// src/core/statusStore.ts
+var fs4 = __toESM(require("fs"));
+var path3 = __toESM(require("path"));
+var STATUS_FILE = ".firstsec-status.json";
+function getStatusFilePath(workspaceRoot) {
+  return path3.join(workspaceRoot, STATUS_FILE);
+}
+function getVulnerabilityStatusKey(vuln) {
+  return `${vuln.filePath}:${vuln.line}:${vuln.category}:${vuln.abstract}`;
+}
+function getLegacyVulnerabilityStatusKey(vuln) {
+  return `${vuln.filePath}:${vuln.line}`;
+}
+function saveStatuses(vulns, workspaceRoot) {
+  const statusMap = {};
+  for (const v of vulns) {
+    statusMap[getVulnerabilityStatusKey(v)] = v.status;
+  }
+  fs4.writeFileSync(getStatusFilePath(workspaceRoot), JSON.stringify(statusMap, null, 2), "utf-8");
+}
+function loadStatuses(workspaceRoot) {
+  const filePath = getStatusFilePath(workspaceRoot);
+  if (!fs4.existsSync(filePath)) return {};
+  try {
+    const raw = fs4.readFileSync(filePath, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+// src/utils/securityUtils.ts
+var path4 = __toESM(require("path"));
+var SENSITIVE_FILE_PATTERNS = [
+  // Configuration files
+  /\.env$/i,
+  /\.env\./i,
+  /config\./i,
+  /\.config\./i,
+  /\.properties$/i,
+  /\.yml$/i,
+  /\.yaml$/i,
+  /\.json$/i,
+  /\.xml$/i,
+  /\.toml$/i,
+  /\.ini$/i,
+  /\.cfg$/i,
+  /\.conf$/i,
+  // Security and authentication files
+  /\.pem$/i,
+  /\.key$/i,
+  /\.crt$/i,
+  /\.p12$/i,
+  /\.pfx$/i,
+  /\.keystore$/i,
+  /\.jks$/i,
+  /\.truststore$/i,
+  // Database files
+  /\.db$/i,
+  /\.sqlite$/i,
+  /\.sql$/i,
+  // Log files
+  /\.log$/i,
+  /\.logs$/i,
+  // Backup files
+  /\.bak$/i,
+  /\.backup$/i,
+  /\.old$/i,
+  // Lock files
+  /\.lock$/i,
+  /\.pid$/i,
+  // Git and version control
+  /\.gitignore$/i,
+  /\.gitattributes$/i,
+  /\.git$/i,
+  // Package managers
+  /package\.json$/i,
+  /package-lock\.json$/i,
+  /yarn\.lock$/i,
+  /pom\.xml$/i,
+  /build\.gradle$/i,
+  /gradle\.properties$/i,
+  /requirements\.txt$/i,
+  /Gemfile$/i,
+  /Gemfile\.lock$/i,
+  /Cargo\.toml$/i,
+  /Cargo\.lock$/i,
+  // IDE and editor files
+  /\.vscode\//i,
+  /\.idea\//i,
+  /\.eclipse$/i,
+  /\.project$/i,
+  /\.classpath$/i,
+  /\.settings\//i,
+  // Build and deployment
+  /Dockerfile$/i,
+  /docker-compose\./i,
+  /\.dockerignore$/i,
+  /Jenkinsfile$/i,
+  /\.travis\.yml$/i,
+  /\.github\//i,
+  /\.gitlab-ci\.yml$/i,
+  // Documentation
+  /README\./i,
+  /CHANGELOG\./i,
+  /LICENSE$/i,
+  /\.md$/i,
+  // System files
+  /\.DS_Store$/i,
+  /Thumbs\.db$/i,
+  /desktop\.ini$/i
+];
+var CRITICAL_FILE_PATTERNS = [
+  /\.env$/i,
+  /\.env\./i,
+  /\.pem$/i,
+  /\.key$/i,
+  /\.crt$/i,
+  /\.p12$/i,
+  /\.pfx$/i,
+  /\.keystore$/i,
+  /\.jks$/i,
+  /\.truststore$/i,
+  /\.git\//i,
+  /package\.json$/i,
+  /pom\.xml$/i,
+  /build\.gradle$/i,
+  /Dockerfile$/i,
+  /docker-compose\./i
+];
+function checkFileSecurity(filePath) {
+  const fileName = path4.basename(filePath);
+  const normalizedPath = filePath.replace(/\\/g, "/").toLowerCase();
+  const isCritical = CRITICAL_FILE_PATTERNS.some((pattern) => pattern.test(normalizedPath));
+  if (isCritical) {
+    return {
+      isSensitive: true,
+      isCritical: true,
+      warningMessage: `\u26A0\uFE0F CRITICAL SECURITY WARNING: ${fileName} contains sensitive configuration, credentials, or system files that should NEVER be modified by AI.`,
+      allowModification: false
+    };
+  }
+  const isSensitive = SENSITIVE_FILE_PATTERNS.some((pattern) => pattern.test(normalizedPath));
+  if (isSensitive) {
+    return {
+      isSensitive: true,
+      isCritical: false,
+      warningMessage: `\u26A0\uFE0F SECURITY WARNING: ${fileName} appears to be a configuration, security, or system file. Modifying it may affect your application's behavior or security.`,
+      allowModification: true
+      // Allow but with warning
+    };
+  }
+  return {
+    isSensitive: false,
+    isCritical: false,
+    allowModification: true
+  };
+}
+function getSensitiveFilesInFix(filePaths) {
+  return filePaths.map((filePath) => checkFileSecurity(filePath));
+}
+function hasCriticalFiles(filePaths) {
+  return filePaths.some((filePath) => checkFileSecurity(filePath).isCritical);
+}
+function getSecuritySummary(filePaths) {
+  const results = getSensitiveFilesInFix(filePaths);
+  const criticalFiles = results.filter((r2) => r2.isCritical).map((r2) => path4.basename(r2.warningMessage?.split(": ")[1] || ""));
+  const sensitiveFiles = results.filter((r2) => r2.isSensitive && !r2.isCritical).map((r2) => path4.basename(r2.warningMessage?.split(": ")[1] || ""));
+  let summary = "";
+  if (criticalFiles.length > 0) {
+    summary += `\u{1F6A8} CRITICAL FILES (BLOCKED): ${criticalFiles.join(", ")}
+`;
+  }
+  if (sensitiveFiles.length > 0) {
+    summary += `\u26A0\uFE0F SENSITIVE FILES: ${sensitiveFiles.join(", ")}
+`;
+  }
+  return summary;
+}
+
+// src/commands/batchFix.ts
+var vscode7 = __toESM(require("vscode"));
+init_batchProcessor();
+
+// src/prompts/batchPrompt.ts
+function generateBatchPrompt(batchGroup) {
+  const { filePath, vulnType, vulnerabilities } = batchGroup;
+  const findings = vulnerabilities.map((v) => `Line ${v.line}: ${v.codeSnippet}`).join("\n\n");
+  return `
+Fix the selected security vulnerabilities in this file.
+
+Before writing any code, determine internally:
+1. the shared vulnerability type or pattern,
+2. the vulnerable sinks or unsafe APIs,
+3. the untrusted inputs or sources that reach them, if any,
+4. the secure remediation pattern that should be applied consistently,
+5. the smallest set of code changes needed to fix all listed findings without changing business logic.
+
+Then apply the fix using one consistent secure coding approach across all listed findings.
+
+TARGET FILE
+File: ${filePath}
+Vulnerability Type: ${vulnType}
+Count: ${vulnerabilities.length}
+
+VULNERABLE CODE
+${findings}
+
+Important rules:
+- Fix only the listed vulnerabilities.
+- Fix the actual vulnerable sinks, not unrelated code.
+- Change only the code that is necessary for the fix.
+- Do not modify a different function by mistake.
+- Do not delete any function.
+- Do not delete business logic.
+- Do not replace real logic with an empty body, placeholder, null, or a trivial return.
+- Do not rewrite the whole file unless absolutely necessary.
+- Do not add dead code or commented-out code.
+- Do not add unused variables, unused methods, or unused imports.
+- Do not suppress or hide the findings with comments.
+- Do not replace one unsafe pattern with another unsafe pattern.
+- Use the standard safe library, validation, encoding, parameterization, or authorization pattern normally used for this vulnerability type.
+- Preserve the original business behavior.
+- Return compilable code only.
+- Prefer fixing the smallest relevant methods or statements instead of rewriting the full file.
+- Apply one consistent fix pattern to the listed vulnerabilities.
+- Prefer a same-file fix if it is secure and sufficient.
+- If another file is absolutely necessary, include it. Otherwise do not touch any other file.
+
+Bad fixes include:
+- deleting a vulnerable method
+- replacing a method body with return, return null, return [], or a constant
+- removing unrelated business logic
+- rewriting the full class when only a few methods need a fix
+
+OUTPUT RULES
+- Return code only.
+- Do not include explanations.
+- Do not include notes.
+- Do not include markdown text except file headers.
+- The first file must be exactly this file: ${filePath}
+
+OUTPUT FORMAT
+
+# ${filePath}
+\`\`\`${getFileExtension(filePath)}
+[fixed code]
+\`\`\`
+
+If another file is absolutely required, add:
+
+# relative/path/to/OtherFile.ext
+\`\`\`
+[fixed code]
+\`\`\`
+
+FINAL CHECK BEFORE ANSWERING
+- Did you fix the actual vulnerable sinks?
+- Did you fix only the listed vulnerabilities?
+- Did you keep the original logic?
+- Did you avoid deleting code?
+- Did you avoid replacing code with a trivial return?
+- Did you avoid rewriting the whole file?
+`;
+}
+function getFileExtension(filePath) {
+  const ext = filePath.split(".").pop()?.toLowerCase();
+  const extensionMap = {
+    java: "java",
+    py: "python",
+    cpp: "cpp",
+    c: "c",
+    cc: "cpp",
+    h: "c",
+    hpp: "cpp"
+  };
+  return extensionMap[ext || ""] || "text";
 }
 
 // src/core/autoFixVulnerability.ts
@@ -8736,167 +8966,8 @@ async function exportVulnerabilities(provider) {
 // src/extension.ts
 init_batchProcessor();
 
-// src/core/distilbertServiceManager.ts
-var vscode16 = __toESM(require("vscode"));
-var fs6 = __toESM(require("fs"));
-var path7 = __toESM(require("path"));
-var import_child_process = require("child_process");
-var serviceProcess;
-var startupPromise;
-function startDistilBertService(context) {
-  if (!startupPromise) {
-    startupPromise = ensureDistilBertService(context).finally(() => {
-      startupPromise = void 0;
-    });
-  }
-  return startupPromise;
-}
-async function ensureDistilBertService(context) {
-  const config2 = vscode16.workspace.getConfiguration("firstsec");
-  const autoStart = config2.get("autoStartDistilbertService", true);
-  if (!autoStart) {
-    return;
-  }
-  const endpoint = config2.get("distilbertEndpoint", "http://127.0.0.1:8000");
-  const endpointParts = parseEndpoint(endpoint);
-  if (await isServiceHealthy(endpointParts.baseUrl)) {
-    return;
-  }
-  const modelPath = config2.get("distilbertModelPath", "C:\\Users\\Fatma\\models\\distilbert_datasetB_best");
-  if (!fs6.existsSync(modelPath)) {
-    vscode16.window.showErrorMessage(`DistilBERT model folder not found: ${modelPath}`);
-    return;
-  }
-  const pythonPath = config2.get("distilbertPythonPath", "python");
-  const ready = await ensurePythonDependencies(context, pythonPath);
-  if (!ready) {
-    return;
-  }
-  startPythonService(context, pythonPath, modelPath, endpointParts);
-  const started = await waitForHealth(endpointParts.baseUrl, 45e3);
-  if (started) {
-    vscode16.window.showInformationMessage("DistilBERT detection service is ready.");
-  } else {
-    vscode16.window.showErrorMessage("DistilBERT detection service could not be started.");
-  }
-}
-async function ensurePythonDependencies(context, pythonPath) {
-  const missing = await getMissingPackages(pythonPath);
-  if (missing.length === 0) {
-    return true;
-  }
-  const choice = await vscode16.window.showInformationMessage(
-    `DistilBERT dependencies are missing: ${missing.join(", ")}. Install now?`,
-    "Install",
-    "Cancel"
-  );
-  if (choice !== "Install") {
-    return false;
-  }
-  const requirementsPath = path7.join(context.extensionPath, "distilbert_service", "requirements.txt");
-  return await vscode16.window.withProgress(
-    {
-      location: vscode16.ProgressLocation.Notification,
-      title: "Installing DistilBERT dependencies",
-      cancellable: false
-    },
-    async () => runProcess(pythonPath, ["-m", "pip", "install", "-r", requirementsPath], context.extensionPath)
-  );
-}
-async function getMissingPackages(pythonPath) {
-  const importCheck = [
-    "import importlib.util",
-    'packages = ["fastapi", "uvicorn", "transformers", "torch", "safetensors"]',
-    "missing = [pkg for pkg in packages if importlib.util.find_spec(pkg) is None]",
-    'print(",".join(missing))'
-  ].join("; ");
-  const output = await runProcessForOutput(pythonPath, ["-c", importCheck], process.cwd());
-  return output.trim() ? output.trim().split(",").filter(Boolean) : [];
-}
-function startPythonService(context, pythonPath, modelPath, endpoint) {
-  if (serviceProcess && !serviceProcess.killed) {
-    return;
-  }
-  serviceProcess = (0, import_child_process.spawn)(
-    pythonPath,
-    ["-m", "uvicorn", "distilbert_service.app:app", "--host", endpoint.host, "--port", endpoint.port],
-    {
-      cwd: context.extensionPath,
-      env: {
-        ...process.env,
-        FIRSTSEC_DISTILBERT_MODEL_DIR: modelPath
-      },
-      windowsHide: true
-    }
-  );
-  serviceProcess.stdout.on("data", (data) => {
-    console.log(`[FirstSec DistilBERT] ${data.toString().trim()}`);
-  });
-  serviceProcess.stderr.on("data", (data) => {
-    console.error(`[FirstSec DistilBERT] ${data.toString().trim()}`);
-  });
-  serviceProcess.on("exit", () => {
-    serviceProcess = void 0;
-  });
-  context.subscriptions.push({
-    dispose: () => {
-      if (serviceProcess && !serviceProcess.killed) {
-        serviceProcess.kill();
-      }
-    }
-  });
-}
-async function isServiceHealthy(baseUrl) {
-  try {
-    const response = await fetch(`${baseUrl}/health`);
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
-async function waitForHealth(baseUrl, timeoutMs) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await isServiceHealthy(baseUrl)) {
-      return true;
-    }
-    await delay(1e3);
-  }
-  return false;
-}
-function parseEndpoint(endpoint) {
-  const parsed = new URL(endpoint);
-  const port = parsed.port || (parsed.protocol === "https:" ? "443" : "80");
-  return {
-    baseUrl: `${parsed.protocol}//${parsed.hostname}:${port}`,
-    host: parsed.hostname,
-    port
-  };
-}
-function runProcess(command, args, cwd) {
-  return new Promise((resolve2) => {
-    const child = (0, import_child_process.spawn)(command, args, { cwd, windowsHide: true });
-    child.on("error", () => resolve2(false));
-    child.on("exit", (code) => resolve2(code === 0));
-  });
-}
-function runProcessForOutput(command, args, cwd) {
-  return new Promise((resolve2) => {
-    const child = (0, import_child_process.spawn)(command, args, { cwd, windowsHide: true });
-    let output = "";
-    child.stdout.on("data", (data) => {
-      output += data.toString();
-    });
-    child.on("error", () => resolve2(""));
-    child.on("exit", () => resolve2(output));
-  });
-}
-function delay(ms) {
-  return new Promise((resolve2) => setTimeout(resolve2, ms));
-}
-
 // src/ui/FirstSecVulnerabilityProvider.ts
-var vscode17 = __toESM(require("vscode"));
+var vscode16 = __toESM(require("vscode"));
 
 // src/core/group.ts
 function groupBySeverity(vulns) {
@@ -8912,23 +8983,23 @@ function getSortedSeverityKeys(grouped) {
 }
 
 // src/ui/FirstSecVulnerabilityProvider.ts
-var BaseTreeItem = class extends vscode17.TreeItem {
+var BaseTreeItem = class extends vscode16.TreeItem {
 };
 var SeverityTreeItem = class extends BaseTreeItem {
   constructor(severity, count) {
-    super(`${severity} (${count})`, vscode17.TreeItemCollapsibleState.Collapsed);
+    super(`${severity} (${count})`, vscode16.TreeItemCollapsibleState.Collapsed);
     this.severity = severity;
   }
   severity;
 };
-var VulnerabilityTreeItem = class extends vscode17.TreeItem {
+var VulnerabilityTreeItem = class extends vscode16.TreeItem {
   constructor(vuln) {
-    super(`${vuln.category} [${vuln.filePath}:${vuln.line}]`, vscode17.TreeItemCollapsibleState.None);
+    super(`${vuln.category} [${vuln.filePath}:${vuln.line}]`, vscode16.TreeItemCollapsibleState.None);
     this.vuln = vuln;
     this.description = vuln.abstract;
     this.tooltip = `${vuln.category}
 ${vuln.filePath}:${vuln.line}`;
-    this.iconPath = new vscode17.ThemeIcon("bug");
+    this.iconPath = new vscode16.ThemeIcon("bug");
     this.command = {
       command: "firstsec.showVulnerabilityDetails",
       title: "Show Vulnerability Details",
@@ -8939,7 +9010,7 @@ ${vuln.filePath}:${vuln.line}`;
   vuln;
 };
 var FirstSecVulnerabilityProvider = class {
-  _onDidChangeTreeData = new vscode17.EventEmitter();
+  _onDidChangeTreeData = new vscode16.EventEmitter();
   onDidChangeTreeData = this._onDidChangeTreeData.event;
   vulnerabilities = [];
   getTreeItem(element) {
@@ -9007,27 +9078,26 @@ function getVulnerabilityIdentity(vuln) {
 // src/extension.ts
 function activate(context) {
   const provider = new FirstSecVulnerabilityProvider();
-  const treeView = vscode18.window.createTreeView("firstsecVulnerabilityExplorer", {
+  const treeView = vscode17.window.createTreeView("firstsecVulnerabilityExplorer", {
     treeDataProvider: provider,
     canSelectMany: true
   });
   async function runOpenAIScan() {
-    const workspaceRoot = vscode18.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+    const workspaceRoot = vscode17.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
     if (!workspaceRoot) {
-      showError("Open a workspace folder before running DistilBERT detection.");
+      showError("Open a workspace folder before running OpenAI detection.");
       return;
     }
-    await startDistilBertService(context);
     setLastDetectionContext(workspaceRoot);
     const vulns = await detectVulnerabilitiesWithOpenAI(workspaceRoot);
     applyStoredStatuses(workspaceRoot, vulns);
     provider.setVulnerabilities(vulns);
-    showInfo(`Detected ${vulns.length} vulnerabilities with DistilBERT.`);
+    showInfo(`Detected ${vulns.length} vulnerabilities with OpenAI.`);
     resetAutoFixCount();
     setTotalVulns(vulns.length);
     const batchOpportunity = detectBatchOpportunities(vulns);
     if (batchOpportunity.totalBatches > 0) {
-      const choice = await vscode18.window.showInformationMessage(
+      const choice = await vscode17.window.showInformationMessage(
         `Found ${batchOpportunity.totalBatches} batch opportunities for ${batchOpportunity.totalVulnerabilities} vulnerabilities.`,
         "Enable Batch Mode",
         "Continue with Individual Mode"
@@ -9038,30 +9108,29 @@ function activate(context) {
     }
   }
   async function runCurrentFileScan() {
-    const workspaceRoot = vscode18.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
-    const editor = vscode18.window.activeTextEditor;
+    const workspaceRoot = vscode17.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+    const editor = vscode17.window.activeTextEditor;
     if (!workspaceRoot) {
-      showError("Open a workspace folder before running DistilBERT detection.");
+      showError("Open a workspace folder before running OpenAI detection.");
       return;
     }
     if (!editor) {
       showError("Open a file before running the current file scan.");
       return;
     }
-    await startDistilBertService(context);
     setLastDetectionContext(workspaceRoot);
     const vulns = await detectVulnerabilitiesInCurrentFile(workspaceRoot, editor.document);
     applyStoredStatuses(workspaceRoot, vulns);
-    provider.replaceVulnerabilitiesForFile(vscode18.workspace.asRelativePath(editor.document.uri, false), vulns);
+    provider.replaceVulnerabilitiesForFile(vscode17.workspace.asRelativePath(editor.document.uri, false), vulns);
     showInfo(`Detected ${vulns.length} vulnerabilities in the current file.`);
     resetAutoFixCount();
     setTotalVulns(vulns.length);
   }
   async function runSelectionScan() {
-    const workspaceRoot = vscode18.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
-    const editor = vscode18.window.activeTextEditor;
+    const workspaceRoot = vscode17.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+    const editor = vscode17.window.activeTextEditor;
     if (!workspaceRoot) {
-      showError("Open a workspace folder before running DistilBERT detection.");
+      showError("Open a workspace folder before running OpenAI detection.");
       return;
     }
     if (!editor) {
@@ -9072,7 +9141,6 @@ function activate(context) {
       showError("Select some code before running the selection scan.");
       return;
     }
-    await startDistilBertService(context);
     setLastDetectionContext(workspaceRoot);
     const vulns = await detectVulnerabilitiesInSelection(workspaceRoot, editor.document, editor.selection);
     applyStoredStatuses(workspaceRoot, vulns);
@@ -9093,41 +9161,40 @@ function activate(context) {
       }
     }
   }
-  void startDistilBertService(context);
   context.subscriptions.push(
-    vscode18.commands.registerCommand("firstsec.loadScanReport", async () => {
+    vscode17.commands.registerCommand("firstsec.loadScanReport", async () => {
       try {
         await runOpenAIScan();
       } catch (e2) {
-        showError("Failed to detect vulnerabilities with DistilBERT: " + (e2.message || e2));
+        showError("Failed to detect vulnerabilities with OpenAI: " + (e2.message || e2));
       }
     }),
-    vscode18.commands.registerCommand("firstsec.rescanWithOpenAI", async () => {
+    vscode17.commands.registerCommand("firstsec.rescanWithOpenAI", async () => {
       try {
         await runOpenAIScan();
       } catch (e2) {
-        showError("Failed to rescan vulnerabilities with DistilBERT: " + (e2.message || e2));
+        showError("Failed to rescan vulnerabilities with OpenAI: " + (e2.message || e2));
       }
     }),
-    vscode18.commands.registerCommand("firstsec.scanCurrentFile", async () => {
+    vscode17.commands.registerCommand("firstsec.scanCurrentFile", async () => {
       try {
         await runCurrentFileScan();
       } catch (e2) {
-        showError("Failed to scan the current file with DistilBERT: " + (e2.message || e2));
+        showError("Failed to scan the current file with OpenAI: " + (e2.message || e2));
       }
     }),
-    vscode18.commands.registerCommand("firstsec.scanCurrentSelection", async () => {
+    vscode17.commands.registerCommand("firstsec.scanCurrentSelection", async () => {
       try {
         await runSelectionScan();
       } catch (e2) {
-        showError("Failed to scan the current selection with DistilBERT: " + (e2.message || e2));
+        showError("Failed to scan the current selection with OpenAI: " + (e2.message || e2));
       }
     }),
-    vscode18.commands.registerCommand("firstsec.refreshVulnerabilities", async () => {
+    vscode17.commands.registerCommand("firstsec.refreshVulnerabilities", async () => {
       await refreshVulnerabilities(provider, provider.setVulnerabilities.bind(provider), resetAutoFixCount, setTotalVulns);
     }),
-    vscode18.commands.registerCommand("firstsec.clearVulnerabilities", async () => {
-      const choice = await vscode18.window.showWarningMessage(
+    vscode17.commands.registerCommand("firstsec.clearVulnerabilities", async () => {
+      const choice = await vscode17.window.showWarningMessage(
         "Clear all currently displayed vulnerabilities from the explorer?",
         "Clear Vulnerabilities",
         "Cancel"
@@ -9140,10 +9207,10 @@ function activate(context) {
       setTotalVulns(0);
       showInfo("Cleared vulnerabilities from the explorer.");
     }),
-    vscode18.commands.registerCommand("firstsec.exportVulnerabilities", async () => {
+    vscode17.commands.registerCommand("firstsec.exportVulnerabilities", async () => {
       await exportVulnerabilities(provider);
     }),
-    vscode18.commands.registerCommand("firstsec.showVulnerabilityDetails", async (item) => {
+    vscode17.commands.registerCommand("firstsec.showVulnerabilityDetails", async (item) => {
       const v = item.vuln;
       const buttons = ["Go to Code", "Auto Fix"];
       if (v.status === "false_positive") {
@@ -9151,7 +9218,7 @@ function activate(context) {
       } else {
         buttons.push("Mark as False Positive");
       }
-      const result = await vscode18.window.showInformationMessage(
+      const result = await vscode17.window.showInformationMessage(
         `Category: ${v.category}
 File: ${v.filePath}
 Line: ${v.line}
@@ -9170,14 +9237,14 @@ ${v.codeSnippet}`,
           await autoFixVulnerability(v);
         }
       } else if (result === "Go to Code") {
-        const fileUri = vscode18.Uri.file(path8.resolve(vscode18.workspace.workspaceFolders?.[0]?.uri.fsPath || "", v.filePath));
-        const document = await vscode18.workspace.openTextDocument(fileUri);
-        const editor = await vscode18.window.showTextDocument(document);
+        const fileUri = vscode17.Uri.file(path7.resolve(vscode17.workspace.workspaceFolders?.[0]?.uri.fsPath || "", v.filePath));
+        const document = await vscode17.workspace.openTextDocument(fileUri);
+        const editor = await vscode17.window.showTextDocument(document);
         const lineIndex = v.line - 1;
         if (lineIndex >= 0 && lineIndex < document.lineCount) {
           const range = document.lineAt(lineIndex).range;
-          editor.revealRange(range, vscode18.TextEditorRevealType.InCenter);
-          editor.selection = new vscode18.Selection(range.start, range.end);
+          editor.revealRange(range, vscode17.TextEditorRevealType.InCenter);
+          editor.selection = new vscode17.Selection(range.start, range.end);
         }
       } else if (result === "Mark as False Positive") {
         await markFalsePositive({ selection: [item] }, provider);
@@ -9185,22 +9252,22 @@ ${v.codeSnippet}`,
         await undoFalsePositiveSingle(v, provider);
       }
     }),
-    vscode18.commands.registerCommand("firstsec.fixAll", async () => {
+    vscode17.commands.registerCommand("firstsec.fixAll", async () => {
       await autoFixAll(provider, autoFixVulnerability);
     }),
-    vscode18.commands.registerCommand("firstsec.fixSelected", async () => {
+    vscode17.commands.registerCommand("firstsec.fixSelected", async () => {
       await autoFixSelected(treeView, autoFixVulnerability);
     }),
-    vscode18.commands.registerCommand("firstsec.markFalsePositive", async (item) => {
+    vscode17.commands.registerCommand("firstsec.markFalsePositive", async (item) => {
       await markFalsePositive(item?.vuln ? { selection: [item] } : treeView, provider);
     }),
-    vscode18.commands.registerCommand("firstsec.markFixed", async (item) => {
+    vscode17.commands.registerCommand("firstsec.markFixed", async (item) => {
       await setVulnerabilityStatus(item?.vuln ? { selection: [item] } : treeView, provider, "fixed");
     }),
-    vscode18.commands.registerCommand("firstsec.markNeedsAttention", async (item) => {
+    vscode17.commands.registerCommand("firstsec.markNeedsAttention", async (item) => {
       await setVulnerabilityStatus(item?.vuln ? { selection: [item] } : treeView, provider, "needs_attention");
     }),
-    vscode18.commands.registerCommand("firstsec.undoFalsePositive", async (item) => {
+    vscode17.commands.registerCommand("firstsec.undoFalsePositive", async (item) => {
       if (item?.vuln) {
         await undoFalsePositiveSingle(item.vuln, provider);
         provider.refresh();
@@ -9209,25 +9276,25 @@ ${v.codeSnippet}`,
       await undoFalsePositive(treeView, provider);
       provider.refresh();
     }),
-    vscode18.commands.registerCommand("firstsec.showFalsePositivesForUndo", async () => {
+    vscode17.commands.registerCommand("firstsec.showFalsePositivesForUndo", async () => {
       await showFalsePositivesForUndo(provider);
     }),
-    vscode18.commands.registerCommand("firstsec.filterByStatus", async () => {
+    vscode17.commands.registerCommand("firstsec.filterByStatus", async () => {
       await filterByStatus(provider);
     }),
-    vscode18.commands.registerCommand("firstsec.buildProject", async () => {
-      const terminal = vscode18.window.createTerminal({ name: "Security Scan Build" });
+    vscode17.commands.registerCommand("firstsec.buildProject", async () => {
+      const terminal = vscode17.window.createTerminal({ name: "Security Scan Build" });
       terminal.show();
       terminal.sendText("mvn clean install");
-      vscode18.window.showInformationMessage("Build started: mvn clean install");
+      vscode17.window.showInformationMessage("Build started: mvn clean install");
     }),
-    vscode18.commands.registerCommand("firstsec.showCostReport", async () => {
+    vscode17.commands.registerCommand("firstsec.showCostReport", async () => {
       await showCostReport();
     }),
-    vscode18.commands.registerCommand("firstsec.exportCostData", async () => {
+    vscode17.commands.registerCommand("firstsec.exportCostData", async () => {
       await exportCostData();
     }),
-    vscode18.commands.registerCommand("firstsec.clearCostData", async () => {
+    vscode17.commands.registerCommand("firstsec.clearCostData", async () => {
       await clearCostData();
     })
   );
